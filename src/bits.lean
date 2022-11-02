@@ -1,8 +1,9 @@
 import data.fintype.card_embedding
+import data.fintype.card
 
 open sum
 
-variables {α β α' β' : Type*} {γ : β → Type*}
+variables {α β α' β' : Type} {γ : β → Type}
 
 def propogate_aux (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
@@ -547,3 +548,88 @@ def term_eval_eq_propogate : Π (t : term),
       congr,
       ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
     end }
+
+variables
+  (init_carry : α → bool)
+  (next_carry : Π (carry : α → bool) (bits : β → bool), (α → bool))
+  (next_bit : Π (carry : α → bool) (bits : β → bool), (α → bool) × bool)
+
+variables [fintype α] [fintype α']
+
+open fintype
+
+lemma exists_repeat (seq : β → ℕ → bool) :
+  ∃ n m : fin (2 ^ (card α) + 1),
+    propogate_carry init_carry next_carry seq n =
+    propogate_carry init_carry next_carry seq m ∧
+    n < m :=
+begin
+  by_contra h,
+  letI : decidable_eq α := classical.dec_eq α,
+  push_neg at h,
+  have := λ a b hab, (le_antisymm (h a b hab) (h b a hab.symm)).symm,
+  simpa using fintype.card_le_of_injective _ this
+end
+
+lemma propogate_carry_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
+  (m n : ℕ)
+  (h₁ : propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₁ m =
+       propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₂ n)
+  (h₃ : ∀ x b, seq₁ b (m + x) = seq₂ b (n + x)) (x : ℕ) :
+  propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₁ (m + x) =
+  propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₂ (n + x) :=
+begin
+  induction x with x ih generalizing seq₁ seq₂,
+  { simp * at * },
+  { simp only [*, nat.add_succ, propogate_carry, add_zero] at *,
+    rw [ih],
+    simp only [← nat.add_succ, h₃],
+    assumption,
+    assumption }
+end
+
+lemma propogate_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
+  (m n : ℕ)
+  (h₁ : propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₁ m =
+       propogate_carry init_carry
+    (λ carry bits, (next_bit carry bits).1) seq₂ n)
+  (h₃ : ∀ x b, seq₁ b (m + x) = seq₂ b (n + x)) (x : ℕ) :
+  propogate init_carry next_bit seq₁ (m + x + 1) =
+  propogate init_carry next_bit seq₂ (n + x + 1) :=
+begin
+  simp only [propogate_succ,
+    propogate_carry_eq_of_carry_eq _ _ _ _ _ _ h₁ h₃],
+  simp only [add_assoc, h₃]
+end
+
+lemma exists_repeat' (seq : β → ℕ → bool)
+  (n : ℕ) (bit : bool)
+    (hn : propogate init_carry next_bit seq n = bit) :
+  ∃ (m ≤ 2 ^ (card α)) (seq2 : β → ℕ → bool),
+    propogate init_carry next_bit seq2 n = bit :=
+begin
+  rcases exists_repeat init_carry (λ carry bits, (next_bit  carry bits).1) seq
+    with ⟨a, b, h₁, h₂⟩,
+
+
+
+end
+
+-- def propogate_aux (init_carry : α → bool)
+--   (next_bit : Π (carry : α → bool) (bits : β → bool),
+--     (α → bool) × bool)
+--   (x : β → ℕ → bool) : ℕ → (α → bool) × bool
+-- | 0 := next_bit init_carry (λ i, x i 0)
+-- | (n+1) :=
+-- next_bit (propogate_aux n).1 (λ i, x i (n+1))
+
+-- def propogate (init_carry : α → bool)
+--   (next_bit : Π (carry : α → bool) (bits : β → bool),
+--     (α → bool) × bool)
+--   (x : β → ℕ → bool) (i : ℕ) : bool :=
+-- (propogate_aux init_carry next_bit x i).2
