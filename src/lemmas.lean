@@ -2,6 +2,7 @@ import data.fintype.card
 import tactic.zify
 import tactic.ring
 import tactic.linarith
+import defs
 
 open sum
 
@@ -178,55 +179,7 @@ begin
   { simp only [propogate_succ, propogate_carry_change_vars, ih] }
 end
 
-inductive term : Type
-| var : ℕ → term
-| zero : term
-| one : term
-| and : term → term → term
-| or : term → term → term
-| xor : term → term → term
-| not : term → term
-| ls : term → term
-| add : term → term → term
-
 open term
-
-
-def zero_seq : ℕ → bool := λ n, ff
-
-def one_seq : ℕ → bool := λ n, n = 0
-
-def and_seq : Π (x y : ℕ → bool), ℕ → bool := λ x y n, x n && y n
-
-def or_seq : Π (x y : ℕ → bool), ℕ → bool := λ x y n, x n || y n
-
-def xor_seq : Π (x y : ℕ → bool), ℕ → bool := λ x y n, bxor (x n) (y n)
-
-def not_seq : Π (x : ℕ → bool), ℕ → bool := λ x n, bnot (x n)
-
-def ls_seq (s : ℕ → bool) : ℕ → bool
-| 0 := ff
-| (n+1) := s n
-
-def add_seq_aux (x y : ℕ → bool) : ℕ → bool × bool
-| 0 := (bxor (x 0) (y 0), x 0 && y 0)
-| (n+1) := let carry := (add_seq_aux n).2 in
-  let a := x (n + 1), b := y (n + 1) in
-  (bxor a (bxor b carry), (a && b) || (b && carry) || (a && carry))
-
-def add_seq (x y : ℕ → bool) : ℕ → bool :=
-λ n, (add_seq_aux x y n).1
-
-def term.eval : Π (t : term) (vars : ℕ → ℕ → bool), ℕ → bool
-| (var n) vars := vars n
-| zero vars := zero_seq
-| one vars := one_seq
-| (and t₁ t₂) vars := and_seq (term.eval t₁ vars) (term.eval t₂ vars)
-| (or t₁ t₂) vars := or_seq (term.eval t₁ vars) (term.eval t₂ vars)
-| (xor t₁ t₂) vars := xor_seq (term.eval t₁ vars) (term.eval t₂ vars)
-| (not t) vars := not_seq (term.eval t vars)
-| (ls t) vars := ls_seq (term.eval t vars)
-| (add t₁ t₂) vars := add_seq (term.eval t₁ vars) (term.eval t₂ vars)
 
 @[simp] def arity : term → ℕ
 | (var n) := n+1
@@ -791,28 +744,4 @@ begin
     exact h (λ j, seq j) _ }
 end
 
-instance decidable_eval_eq (t₁ t₂ : term) :
-  decidable (t₁.eval = t₂.eval) :=
-begin
-  let p := term_eval_eq_propogate (t₁.xor t₂),
-  letI := p.i,
-  refine decidable_of_iff
-    (∀ (seq : fin (arity (t₁.xor t₂)) →
-      fin (2 ^ (card p.α)) → bool)
-      (i : fin (2 ^ card p.α)),
-      (t₁.xor t₂).eval
-      (λ i j, if hij : i < arity (t₁.xor t₂) ∧ j < 2 ^ (card p.α)
-        then seq ⟨i, hij.1⟩ ⟨j, hij.2⟩ else ff) i = ff) _,
-  rw [eval_eq_iff_xor_seq_eq_zero, p.good],
-  rw [function.funext_iff, propogate_eq_zero_iff],
-  simp only [← eval_fin_eq_eval, p.good],
-  split,
-  { intros h seq i hi,
-    rw ← h (λ i j, seq i j) ⟨i, hi⟩,
-    apply propogate_eq_of_seq_eq_le,
-    intros b j hj,
-    simp [lt_of_le_of_lt hj hi] },
-  { intros h seq i,
-    rw h,
-    exact i.2 }
-end
+
