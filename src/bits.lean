@@ -816,6 +816,3 @@ begin
     rw h,
     exact i.2 }
 end
-
-#eval (((term.var 0).add (term.var 1)).eval =
-  ((term.var 1).add (term.var 0)).eval : bool)
