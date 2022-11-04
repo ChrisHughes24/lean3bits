@@ -8,77 +8,77 @@ open sum
 
 variables {α β α' β' : Type} {γ : β → Type}
 
-def propogate_aux (init_carry : α → bool)
+def propagate_aux (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β → ℕ → bool) : ℕ → (α → bool) × bool
 | 0 := next_bit init_carry (λ i, x i 0)
 | (n+1) :=
-next_bit (propogate_aux n).1 (λ i, x i (n+1))
+next_bit (propagate_aux n).1 (λ i, x i (n+1))
 
-def propogate (init_carry : α → bool)
+def propagate (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β → ℕ → bool) (i : ℕ) : bool :=
-(propogate_aux init_carry next_bit x i).2
+(propagate_aux init_carry next_bit x i).2
 
-@[simp] def propogate_carry (init_carry : α → bool)
+@[simp] def propagate_carry (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool))
   (x : β → ℕ → bool) : ℕ → (α → bool)
 | 0 := next_bit init_carry (λ i, x i 0)
-| (n+1) := next_bit (propogate_carry n) (λ i, x i (n+1))
+| (n+1) := next_bit (propagate_carry n) (λ i, x i (n+1))
 
-@[simp] def propogate_carry2 (init_carry : α → bool)
+@[simp] def propagate_carry2 (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool))
   (x : β → ℕ → bool) : ℕ → (α → bool)
 | 0 := init_carry
-| (n+1) := next_bit (propogate_carry2 n) (λ i, x i n)
+| (n+1) := next_bit (propagate_carry2 n) (λ i, x i n)
 
-lemma propogate_carry2_succ (init_carry : α → bool)
+lemma propagate_carry2_succ (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool))
   (x : β → ℕ → bool) (n : ℕ) :
-  propogate_carry2 init_carry next_bit x (n+1) =
-  propogate_carry init_carry next_bit x n :=
+  propagate_carry2 init_carry next_bit x (n+1) =
+  propagate_carry init_carry next_bit x n :=
 by induction n; simp *
 
-@[simp] lemma propogate_aux_fst_eq_carry (init_carry : α → bool)
+@[simp] lemma propagate_aux_fst_eq_carry (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β → ℕ → bool) : ∀ n : ℕ,
-  (propogate_aux init_carry next_bit x n).1 =
-  propogate_carry init_carry (λ c b, (next_bit c b).1) x n
+  (propagate_aux init_carry next_bit x n).1 =
+  propagate_carry init_carry (λ c b, (next_bit c b).1) x n
 | 0 := rfl
-| (n+1) := by rw [propogate_aux, propogate_carry, propogate_aux_fst_eq_carry]
+| (n+1) := by rw [propagate_aux, propagate_carry, propagate_aux_fst_eq_carry]
 
-@[simp] lemma propogate_zero (init_carry : α → bool)
+@[simp] lemma propagate_zero (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
   (α → bool) × bool)
   (x : β → ℕ → bool) :
-  propogate init_carry next_bit x 0 = (next_bit init_carry (λ i, x i 0)).2 :=
+  propagate init_carry next_bit x 0 = (next_bit init_carry (λ i, x i 0)).2 :=
 rfl
 
-lemma propogate_succ (init_carry : α → bool)
+lemma propagate_succ (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β → ℕ → bool) (i : ℕ) :
-  propogate init_carry next_bit x (i+1) = (next_bit
-    (propogate_carry init_carry (λ c b, (next_bit c b).1) x i)
+  propagate init_carry next_bit x (i+1) = (next_bit
+    (propagate_carry init_carry (λ c b, (next_bit c b).1) x i)
     (λ j, x j (i+1))).2 :=
-by rw [← propogate_aux_fst_eq_carry]; refl
+by rw [← propagate_aux_fst_eq_carry]; refl
 
-lemma propogate_succ2 (init_carry : α → bool)
+lemma propagate_succ2 (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β → ℕ → bool) (i : ℕ) :
-  propogate init_carry next_bit x (i+1) = (next_bit
-    (propogate_carry2 init_carry (λ c b, (next_bit c b).1) x (i+1))
+  propagate init_carry next_bit x (i+1) = (next_bit
+    (propagate_carry2 init_carry (λ c b, (next_bit c b).1) x (i+1))
     (λ j, x j (i+1))).2 :=
-by rw [propogate_carry2_succ, ← propogate_aux_fst_eq_carry]; refl
+by rw [propagate_carry2_succ, ← propagate_aux_fst_eq_carry]; refl
 
-lemma propogate_carry_propogate {δ : β → Type*} {β' : Type}
+lemma propagate_carry_propagate {δ : β → Type*} {β' : Type}
     (f : Π a, δ a → β') : Π (n : ℕ) (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool))
@@ -86,13 +86,13 @@ lemma propogate_carry_propogate {δ : β → Type*} {β' : Type}
   (next_bit_x : Π a (carry : γ a → bool) (bits : δ a → bool),
     (γ a → bool) × bool)
   (x : β' → ℕ → bool),
-  propogate_carry init_carry next_bit (λ a, propogate (init_carry_x a)
+  propagate_carry init_carry next_bit (λ a, propagate (init_carry_x a)
     (next_bit_x a) (λ d, x (f a d))) n =
-  propogate_carry
+  propagate_carry
     (λ a : α ⊕ (Σ a, γ a), sum.elim init_carry (λ b : Σ a, γ a,
       init_carry_x b.1 b.2) a)
     (λ (carry : (α ⊕ (Σ a, γ a)) → bool) (bits : β' → bool),
-  -- first compute (propogate (init_carry_x a) (next_bit_x a) (x a) n)
+  -- first compute (propagate (init_carry_x a) (next_bit_x a) (x a) n)
       let f : Π (a : β), (γ a → bool) × bool := λ a, next_bit_x a (λ d,
         carry (inr ⟨a, d⟩)) (λ d, bits (f a d)) in
       let g : (α → bool) := (next_bit (carry ∘ inl) (λ a, (f a).2)) in
@@ -101,9 +101,9 @@ lemma propogate_carry_propogate {δ : β → Type*} {β' : Type}
     x n ∘ inl
 | 0 init_carry next_bit init_carry_x next_bit_x x := rfl
 | (n+1) init_carry next_bit init_carry_x next_bit_x x := begin
-  have := propogate_carry_propogate n,
+  have := propagate_carry_propagate n,
   clear_aux_decl,
-  simp only [propogate_carry, propogate_succ, elim_inl] at *,
+  simp only [propagate_carry, propagate_succ, elim_inl] at *,
   conv_lhs { simp only [this] },
   clear this,
   ext,
@@ -115,7 +115,7 @@ lemma propogate_carry_propogate {δ : β → Type*} {β' : Type}
   { simp [ih] }
 end
 
-lemma propogate_propogate {δ : β → Type*} {β' : Type}
+lemma propagate_propagate {δ : β → Type*} {β' : Type}
     (f : Π a, δ a → β') : Π (n : ℕ) (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
@@ -123,13 +123,13 @@ lemma propogate_propogate {δ : β → Type*} {β' : Type}
   (next_bit_x : Π a (carry : γ a → bool) (bits : δ a → bool),
     (γ a → bool) × bool)
   (x : β' → ℕ → bool),
-  propogate init_carry next_bit (λ a, propogate (init_carry_x a)
+  propagate init_carry next_bit (λ a, propagate (init_carry_x a)
     (next_bit_x a) (λ d, x (f a d))) n =
-  propogate
+  propagate
     (λ a : α ⊕ (Σ a, γ a), sum.elim init_carry (λ b : Σ a, γ a,
       init_carry_x b.1 b.2) a)
     (λ (carry : (α ⊕ (Σ a, γ a)) → bool) (bits : β' → bool),
-      -- first compute (propogate (init_carry_x a) (next_bit_x a) (x a) n)
+      -- first compute (propagate (init_carry_x a) (next_bit_x a) (x a) n)
       let f : Π (a : β), (γ a → bool) × bool := λ a, next_bit_x a (λ d,
         carry (inr ⟨a, d⟩)) (λ d, bits (f a d)) in
       let g : (α → bool) × bool := (next_bit (carry ∘ inl) (λ a, (f a).2)) in
@@ -138,9 +138,9 @@ lemma propogate_propogate {δ : β → Type*} {β' : Type}
   x n
 | 0 init_carry next_bit init_carry_x next_bit_x x := rfl
 | (n+1) init_carry next_bit init_carry_x next_bit_x x := begin
-  simp only [propogate_succ],
+  simp only [propagate_succ],
   clear_aux_decl,
-  rw [propogate_carry_propogate],
+  rw [propagate_carry_propagate],
   congr,
   ext,
   congr,
@@ -149,14 +149,14 @@ lemma propogate_propogate {δ : β → Type*} {β' : Type}
   { simp [ih] }
 end
 
-lemma propogate_carry_change_vars {β' : Type}
+lemma propagate_carry_change_vars {β' : Type}
   (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool))
   (x : β' → ℕ → bool) (i : ℕ)
   (change_vars : β → β') :
-  propogate_carry init_carry next_bit (λ b, x (change_vars b)) i =
-  propogate_carry init_carry (λ (carry : α → bool) (bits : β' → bool),
+  propagate_carry init_carry next_bit (λ b, x (change_vars b)) i =
+  propagate_carry init_carry (λ (carry : α → bool) (bits : β' → bool),
     next_bit carry (λ b, bits (change_vars b))) x i :=
 begin
   induction i,
@@ -164,19 +164,19 @@ begin
   { simp * }
 end
 
-lemma propogate_change_vars {β' : Type}
+lemma propagate_change_vars {β' : Type}
   (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
   (x : β' → ℕ → bool) (i : ℕ)
   (change_vars : β → β') :
-  propogate init_carry next_bit (λ b, x (change_vars b)) i =
-  propogate init_carry (λ (carry : α → bool) (bits : β' → bool),
+  propagate init_carry next_bit (λ b, x (change_vars b)) i =
+  propagate init_carry (λ (carry : α → bool) (bits : β' → bool),
     next_bit carry (λ b, bits (change_vars b))) x i :=
 begin
   induction i with i ih,
   { refl },
-  { simp only [propogate_succ, propogate_carry_change_vars, ih] }
+  { simp only [propagate_succ, propagate_carry_change_vars, ih] }
 end
 
 open term
@@ -226,57 +226,57 @@ begin
   dsimp [term.eval_fin, term.eval, arity] at *; simp *
 end
 
-lemma id_eq_propogate (x : ℕ → bool) :
-  x = propogate empty.elim (λ _ (y : unit → bool), (empty.elim, y ())) (λ _, x) :=
+lemma id_eq_propagate (x : ℕ → bool) :
+  x = propagate empty.elim (λ _ (y : unit → bool), (empty.elim, y ())) (λ _, x) :=
 by ext n; cases n; refl
 
-lemma zero_eq_propogate :
-  zero_seq = propogate empty.elim (λ (_ _ : empty → bool), (empty.elim, ff)) empty.elim :=
+lemma zero_eq_propagate :
+  zero_seq = propagate empty.elim (λ (_ _ : empty → bool), (empty.elim, ff)) empty.elim :=
 by ext n; cases n; refl
 
-lemma one_eq_propogate :
-  one_seq = propogate (λ _ : unit, tt) (λ f (_ : empty → bool), (λ _, ff, f ())) empty.elim :=
+lemma one_eq_propagate :
+  one_seq = propagate (λ _ : unit, tt) (λ f (_ : empty → bool), (λ _, ff, f ())) empty.elim :=
 begin
   ext n,
   cases n with n,
   { refl },
   { cases n,
-    { simp [one_seq, propogate_succ] },
-    { simp [one_seq, propogate_succ] } }
+    { simp [one_seq, propagate_succ] },
+    { simp [one_seq, propagate_succ] } }
 end
 
-lemma and_eq_propogate (x y : ℕ → bool) :
-  and_seq x y = propogate empty.elim
+lemma and_eq_propagate (x y : ℕ → bool) :
+  and_seq x y = propagate empty.elim
     (λ _ (y : bool → bool), (empty.elim, y tt && y ff)) (λ b, cond b x y) :=
-by ext n; cases n; simp [propogate, propogate_aux, and_seq]
+by ext n; cases n; simp [propagate, propagate_aux, and_seq]
 
-lemma or_eq_propogate (x y : ℕ → bool) :
-  or_seq x y = propogate empty.elim
+lemma or_eq_propagate (x y : ℕ → bool) :
+  or_seq x y = propagate empty.elim
     (λ _ (y : bool → bool), (empty.elim, y tt || y ff)) (λ b, cond b x y) :=
-by ext n; cases n; simp [propogate, propogate_aux, or_seq]
+by ext n; cases n; simp [propagate, propagate_aux, or_seq]
 
-lemma xor_eq_propogate (x y : ℕ → bool) :
-  xor_seq x y = propogate empty.elim
+lemma xor_eq_propagate (x y : ℕ → bool) :
+  xor_seq x y = propagate empty.elim
     (λ _ (y : bool → bool), (empty.elim, bxor (y tt) (y ff))) (λ b, cond b x y) :=
-by ext n; cases n; simp [propogate, propogate_aux, xor_seq]
+by ext n; cases n; simp [propagate, propagate_aux, xor_seq]
 
-lemma not_eq_propogate (x : ℕ → bool) :
-  not_seq x = propogate empty.elim (λ _ (y : unit → bool), (empty.elim, bnot (y ()))) (λ _, x) :=
-by ext n; cases n; simp [propogate, propogate_aux, not_seq]
+lemma not_eq_propagate (x : ℕ → bool) :
+  not_seq x = propagate empty.elim (λ _ (y : unit → bool), (empty.elim, bnot (y ()))) (λ _, x) :=
+by ext n; cases n; simp [propagate, propagate_aux, not_seq]
 
-lemma ls_eq_propogate (x : ℕ → bool) :
-  ls_seq x = propogate (λ _ : unit, ff) (λ (carry x : unit → bool), (x, carry ())) (λ _, x) :=
+lemma ls_eq_propagate (x : ℕ → bool) :
+  ls_seq x = propagate (λ _ : unit, ff) (λ (carry x : unit → bool), (x, carry ())) (λ _, x) :=
 begin
   ext n,
   cases n with n,
   { refl },
   { cases n,
-    { simp [ls_seq, propogate_succ] },
-    { simp [ls_seq, propogate_succ] } }
+    { simp [ls_seq, propagate_succ] },
+    { simp [ls_seq, propagate_succ] } }
 end
 
-lemma add_seq_aux_eq_propogate_carry (x y : ℕ → bool) (n : ℕ) :
-  (add_seq_aux x y n).2 = propogate_carry (λ _, ff)
+lemma add_seq_aux_eq_propagate_carry (x y : ℕ → bool) (n : ℕ) :
+  (add_seq_aux x y n).2 = propagate_carry (λ _, ff)
     (λ (carry : unit → bool) (bits : bool → bool),
       λ _, (bits tt && bits ff) || (bits ff && carry ()) || (bits tt && carry ()))
   (λ b, cond b x y) n () :=
@@ -286,8 +286,8 @@ begin
   { simp [add_seq_aux, *] }
 end
 
-lemma add_eq_propogate (x y : ℕ → bool) :
-  add_seq x y = propogate (λ _, ff)
+lemma add_eq_propagate (x y : ℕ → bool) :
+  add_seq x y = propagate (λ _, ff)
     (λ (carry : unit → bool) (bits : bool → bool),
       (λ _, (bits tt && bits ff) || (bits ff && carry ()) || (bits tt && carry ()),
         bxor (bits tt) (bxor (bits ff) (carry ()))))
@@ -297,24 +297,24 @@ begin
   cases n with n,
   { simp [add_seq, add_seq_aux] },
   { cases n,
-    { simp [add_seq, add_seq_aux, propogate_succ] },
-    { simp [add_seq, add_seq_aux, add_seq_aux_eq_propogate_carry,
-        propogate_succ] } }
+    { simp [add_seq, add_seq_aux, propagate_succ] },
+    { simp [add_seq, add_seq_aux, add_seq_aux_eq_propagate_carry,
+        propagate_succ] } }
 end
 
-structure propogate_solution (t : term) : Type 1 :=
+structure propagate_solution (t : term) : Type 1 :=
 ( α  : Type )
 [ i : fintype α ]
 ( init_carry : α → bool )
 ( next_bit : Π (carry : α → bool) (bits : fin (arity t) → bool),
     (α → bool) × bool )
-( good : t.eval_fin = propogate init_carry next_bit )
+( good : t.eval_fin = propagate init_carry next_bit )
 
 instance {α β : Type*} [fintype α] [fintype β] (b : bool) :
   fintype (cond b α β) :=
 by cases b; dsimp; apply_instance
 
-lemma cond_propogate {α α' β β' : Type}
+lemma cond_propagate {α α' β β' : Type}
   (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool),
     (α → bool) × bool)
@@ -323,17 +323,17 @@ lemma cond_propogate {α α' β β' : Type}
     (α' → bool) × bool)
   {γ : Type} (fβ : β → γ) (fβ' : β' → γ)
   (x : γ → ℕ → bool) (b : bool) :
-  cond b (propogate init_carry next_bit (λ b, (x (fβ b))))
-    (propogate init_carry' next_bit' (λ b, (x (fβ' b)))) =
-  propogate (show cond b α α' → bool, from bool.rec init_carry' init_carry b)
+  cond b (propagate init_carry next_bit (λ b, (x (fβ b))))
+    (propagate init_carry' next_bit' (λ b, (x (fβ' b)))) =
+  propagate (show cond b α α' → bool, from bool.rec init_carry' init_carry b)
     (show Π (carry : cond b α α' → bool) (bits : cond b β β' → bool),
         (cond b α α' → bool) × bool,
       from bool.rec next_bit' next_bit b)
     (show cond b β β' → ℕ → bool, from bool.rec (λ b, (x (fβ' b))) (λ b, (x (fβ b))) b) :=
 by cases b; refl
 
-def term_eval_eq_propogate : Π (t : term),
-  propogate_solution t
+def term_eval_eq_propagate : Π (t : term),
+  propagate_solution t
 | (var n) :=
   { α := empty,
     i := by apply_instance,
@@ -344,15 +344,15 @@ def term_eval_eq_propogate : Π (t : term),
       cases i with i,
       { refl },
       { cases i,
-        { simp [term.eval_fin, propogate_succ] },
-        { simp [term.eval_fin, propogate_succ] } }
+        { simp [term.eval_fin, propagate_succ] },
+        { simp [term.eval_fin, propagate_succ] } }
     end }
 | zero :=
   { α := empty,
     i := by apply_instance,
     init_carry := empty.elim,
     next_bit := (λ _ (y : fin 0 → bool), (empty.elim, ff)),
-    good := by ext x i; cases i; simp [term.eval_fin, zero_seq, propogate_succ] }
+    good := by ext x i; cases i; simp [term.eval_fin, zero_seq, propagate_succ] }
 | one :=
   { α := unit,
     i := by apply_instance,
@@ -363,12 +363,12 @@ def term_eval_eq_propogate : Π (t : term),
       cases i with i,
       { simp [one_seq] },
       { cases i with i,
-        { simp [one_seq, propogate_succ] },
-        { simp [one_seq, propogate_succ] } }
+        { simp [one_seq, propagate_succ] },
+        { simp [one_seq, propagate_succ] } }
     end }
 | (and t₁ t₂) :=
-  let p₁ := term_eval_eq_propogate t₁ in
-  let p₂ := term_eval_eq_propogate t₂ in
+  let p₁ := term_eval_eq_propagate t₁ in
+  let p₂ := term_eval_eq_propagate t₂ in
   { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
     i := by letI := p₁.i; letI := p₂.i; apply_instance,
     init_carry := sum.elim (λ _, ff)
@@ -379,10 +379,10 @@ def term_eval_eq_propogate : Π (t : term),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, and_eq_propogate],
-      simp only [cond_propogate],
+      rw [term.eval_fin, p₁.good, p₂.good, and_eq_propagate],
+      simp only [cond_propagate],
       dsimp,
-      have := propogate_propogate
+      have := propagate_propagate
         (λ (a : bool),
           show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
             from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
@@ -397,8 +397,8 @@ def term_eval_eq_propogate : Π (t : term),
       ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
     end }
 | (or t₁ t₂) :=
-  let p₁ := term_eval_eq_propogate t₁ in
-  let p₂ := term_eval_eq_propogate t₂ in
+  let p₁ := term_eval_eq_propagate t₁ in
+  let p₂ := term_eval_eq_propagate t₂ in
   { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
     i := by letI := p₁.i; letI := p₂.i; apply_instance,
     init_carry := sum.elim (λ _, ff)
@@ -409,10 +409,10 @@ def term_eval_eq_propogate : Π (t : term),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, or_eq_propogate],
-      simp only [cond_propogate],
+      rw [term.eval_fin, p₁.good, p₂.good, or_eq_propagate],
+      simp only [cond_propagate],
       dsimp,
-      have := propogate_propogate
+      have := propagate_propagate
         (λ (a : bool),
           show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
             from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
@@ -427,8 +427,8 @@ def term_eval_eq_propogate : Π (t : term),
       ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
     end }
 | (xor t₁ t₂) :=
-  let p₁ := term_eval_eq_propogate t₁ in
-  let p₂ := term_eval_eq_propogate t₂ in
+  let p₁ := term_eval_eq_propagate t₁ in
+  let p₂ := term_eval_eq_propagate t₂ in
   { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
     i := by letI := p₁.i; letI := p₂.i; apply_instance,
     init_carry := sum.elim (λ _, ff)
@@ -439,10 +439,10 @@ def term_eval_eq_propogate : Π (t : term),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, xor_eq_propogate],
-      simp only [cond_propogate],
+      rw [term.eval_fin, p₁.good, p₂.good, xor_eq_propagate],
+      simp only [cond_propagate],
       dsimp,
-      have := propogate_propogate
+      have := propagate_propagate
         (λ (a : bool),
           show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
             from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
@@ -457,16 +457,16 @@ def term_eval_eq_propogate : Π (t : term),
       ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
     end }
 | (ls t) :=
-  let p := term_eval_eq_propogate t in
+  let p := term_eval_eq_propagate t in
   { α := unit ⊕ Σ s : unit, p.α,
     i := by letI := p.i; apply_instance,
     init_carry := sum.elim (λ _, ff) (λ x, p.init_carry x.2),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p.good, ls_eq_propogate],
+      rw [term.eval_fin, p.good, ls_eq_propagate],
       dsimp,
-      exact propogate_propogate
+      exact propagate_propagate
         (λ (a : unit),
           show fin (arity t) → fin (arity t), from id) i
         (λ _ : unit, ff)
@@ -475,16 +475,16 @@ def term_eval_eq_propogate : Π (t : term),
         (λ _, p.next_bit) x
     end }
 | (not t) :=
-  let p := term_eval_eq_propogate t in
+  let p := term_eval_eq_propagate t in
   { α := empty ⊕ Σ s : unit, p.α,
     i := by letI := p.i; apply_instance,
     init_carry := sum.elim empty.elim (λ x, p.init_carry x.2),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p.good, not_eq_propogate],
+      rw [term.eval_fin, p.good, not_eq_propagate],
       dsimp,
-      have := propogate_propogate
+      have := propagate_propagate
         (λ (a : unit),
           show fin (arity t) → fin (arity t), from id) i
         empty.elim
@@ -496,8 +496,8 @@ def term_eval_eq_propogate : Π (t : term),
       refl
     end }
 | (add t₁ t₂) :=
-  let p₁ := term_eval_eq_propogate t₁ in
-  let p₂ := term_eval_eq_propogate t₂ in
+  let p₁ := term_eval_eq_propagate t₁ in
+  let p₂ := term_eval_eq_propagate t₂ in
   { α := unit ⊕ Σ (b : bool), cond b p₁.α p₂.α,
     i := by letI := p₁.i; letI := p₂.i; apply_instance,
     init_carry := sum.elim (λ _, ff)
@@ -508,10 +508,10 @@ def term_eval_eq_propogate : Π (t : term),
     next_bit := _,
     good := begin
       ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, add_eq_propogate],
-      simp only [cond_propogate],
+      rw [term.eval_fin, p₁.good, p₂.good, add_eq_propagate],
+      simp only [cond_propagate],
       dsimp,
-      have := propogate_propogate
+      have := propagate_propagate
         (λ (a : bool),
           show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
             from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
@@ -539,8 +539,8 @@ open fintype
 
 lemma exists_repeat_carry (seq : β → ℕ → bool) :
   ∃ n m : fin (2 ^ (card α) + 1),
-    propogate_carry2 init_carry next_carry seq n =
-    propogate_carry2 init_carry next_carry seq m ∧
+    propagate_carry2 init_carry next_carry seq n =
+    propagate_carry2 init_carry next_carry seq m ∧
     n < m :=
 begin
   by_contra h,
@@ -550,116 +550,116 @@ begin
   simpa using fintype.card_le_of_injective _ this
 end
 
-lemma propogate_carry2_eq_of_seq_eq_lt (seq₁ seq₂ : β → ℕ → bool)
+lemma propagate_carry2_eq_of_seq_eq_lt (seq₁ seq₂ : β → ℕ → bool)
   (init_carry : α → bool)
   (next_carry : Π (carry : α → bool) (bits : β → bool), (α → bool))
   (i : ℕ) (h : ∀ (b) j < i, seq₁ b j = seq₂ b j) :
-  propogate_carry2 init_carry next_carry seq₁ i =
-    propogate_carry2 init_carry next_carry seq₂ i :=
+  propagate_carry2 init_carry next_carry seq₁ i =
+    propagate_carry2 init_carry next_carry seq₂ i :=
 begin
   induction i with i ih,
-  { simp [propogate_carry2] },
-  { simp [propogate_carry2, h _ i (nat.lt_succ_self i)],
+  { simp [propagate_carry2] },
+  { simp [propagate_carry2, h _ i (nat.lt_succ_self i)],
     rw ih,
     exact λ b j hj, h b j (nat.lt_succ_of_lt hj) }
 end
 
-lemma propogate_eq_of_seq_eq_le (seq₁ seq₂ : β → ℕ → bool)
+lemma propagate_eq_of_seq_eq_le (seq₁ seq₂ : β → ℕ → bool)
   (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool), (α → bool) × bool)
   (i : ℕ) (h : ∀ (b) j ≤ i, seq₁ b j = seq₂ b j) :
-  propogate init_carry next_bit seq₁ i =
-    propogate init_carry next_bit seq₂ i :=
+  propagate init_carry next_bit seq₁ i =
+    propagate init_carry next_bit seq₂ i :=
 begin
   cases i,
-  { simp [propogate_zero, h _ 0 (le_refl _)] },
-  { simp only [propogate_succ2, propogate_succ2, h _ _ (le_refl _)],
+  { simp [propagate_zero, h _ 0 (le_refl _)] },
+  { simp only [propagate_succ2, propagate_succ2, h _ _ (le_refl _)],
     congr' 2,
-    apply propogate_carry2_eq_of_seq_eq_lt,
+    apply propagate_carry2_eq_of_seq_eq_lt,
     exact λ b j hj, h b j (le_of_lt hj) }
 end
 
-lemma propogate_carry2_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
+lemma propagate_carry2_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
   (m n : ℕ)
-  (h₁ : propogate_carry2 init_carry
+  (h₁ : propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₁ m =
-       propogate_carry2 init_carry
+       propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₂ n) (x : ℕ)
   (h₃ : ∀ y b, y ≤ x → seq₁ b (m + y) = seq₂ b (n + y))  :
-  propogate_carry2 init_carry
+  propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₁ (m + x) =
-  propogate_carry2 init_carry
+  propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₂ (n + x) :=
 begin
   induction x with x ih generalizing seq₁ seq₂,
   { simp * at * },
   { simp only [h₃ x _ (nat.le_succ _),
-      nat.add_succ, propogate_carry2, add_zero] at *,
+      nat.add_succ, propagate_carry2, add_zero] at *,
     rw [ih],
     assumption,
     exact λ y b h, h₃ y b (nat.le_succ_of_le h) }
 end
 
-lemma propogate_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
+lemma propagate_eq_of_carry_eq (seq₁ seq₂ : β → ℕ → bool)
   (m n : ℕ)
-  (h₁ : propogate_carry2 init_carry
+  (h₁ : propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₁ m =
-       propogate_carry2 init_carry
+       propagate_carry2 init_carry
     (λ carry bits, (next_bit carry bits).1) seq₂ n) (x : ℕ)
   (h₃ : ∀ y b, y ≤ x → seq₁ b (m + y) = seq₂ b (n + y))  :
-  propogate init_carry next_bit seq₁ (m + x) =
-  propogate init_carry next_bit seq₂ (n + x) :=
+  propagate init_carry next_bit seq₁ (m + x) =
+  propagate init_carry next_bit seq₂ (n + x) :=
 begin
   cases x,
   { cases m,
     { cases n,
-      { simp [h₃ 0 _ (le_refl _), propogate_carry2, *] at * },
-      { simp [*, h₃ 0 _ (le_refl _), propogate_succ2] at *,
+      { simp [h₃ 0 _ (le_refl _), propagate_carry2, *] at * },
+      { simp [*, h₃ 0 _ (le_refl _), propagate_succ2] at *,
         rw [← h₁] } },
     { cases n,
-      { simp [*, propogate_succ2] at *,
+      { simp [*, propagate_succ2] at *,
         simp [← h₃ 0 _ rfl] },
-      { rw [propogate_succ2, h₁, propogate_succ2],
+      { rw [propagate_succ2, h₁, propagate_succ2],
         have := h₃ 0,
         simp * at * } } },
-  { simp only [nat.add_succ, propogate_succ2, add_zero],
+  { simp only [nat.add_succ, propagate_succ2, add_zero],
     simp [← nat.add_succ, h₃ _ _ (le_refl _)],
     congr' 2,
-    apply propogate_carry2_eq_of_carry_eq,
+    apply propagate_carry2_eq_of_carry_eq,
     assumption,
     assumption }
 end
 
-lemma propogate_carry_propogate_carry_add (x : β → ℕ → bool) :
+lemma propagate_carry_propagate_carry_add (x : β → ℕ → bool) :
   ∀ (init_carry : α → bool)
     (next_carry : Π (carry : α → bool) (bits : β → bool), (α → bool)),
   ∀ n i : ℕ,
-  propogate_carry2 (propogate_carry2 init_carry next_carry x n)
+  propagate_carry2 (propagate_carry2 init_carry next_carry x n)
     next_carry (λ b k, x b (k + n)) i =
-  propogate_carry2 init_carry next_carry x (i + n)
-| init_carry next_carry 0 0 := by simp [propogate_carry2]
+  propagate_carry2 init_carry next_carry x (i + n)
+| init_carry next_carry 0 0 := by simp [propagate_carry2]
 | init_carry next_carry (n+1) 0 :=
-  by simp [propogate_carry, propogate_carry2_succ]
+  by simp [propagate_carry, propagate_carry2_succ]
 | init_carry next_carry n (i+1) := begin
-  rw [propogate_carry2, add_assoc,
-    propogate_carry_propogate_carry_add],
+  rw [propagate_carry2, add_assoc,
+    propagate_carry_propagate_carry_add],
   simp only [nat.one_add, nat.add_one, nat.succ_add, nat.add_succ,
-    add_zero, propogate_carry2, zero_add]
+    add_zero, propagate_carry2, zero_add]
 end
 
 lemma exists_repeat : ∀ (seq : β → ℕ → bool)
   (n : ℕ),
   ∃ (m < 2 ^ (card α)) (seq2 : β → ℕ → bool),
-    propogate init_carry next_bit seq2 m = propogate init_carry next_bit seq n
+    propagate init_carry next_bit seq2 m = propagate init_carry next_bit seq n
 | seq n :=
 begin
   by_cases hn2 : n < 2 ^ card α,
   { exact ⟨n, hn2, seq, rfl⟩ },
-  { rcases exists_repeat_carry (propogate_carry2 init_carry (λ c b, (next_bit c b).1) seq
+  { rcases exists_repeat_carry (propagate_carry2 init_carry (λ c b, (next_bit c b).1) seq
         (n - 2 ^ card α))
       (λ carry bits, (next_bit  carry bits).1)
       (λ b i, seq b (i + (n - 2^ (card α)))) with ⟨a, b, h₁, h₂⟩,
-    simp only [propogate_carry_propogate_carry_add] at h₁,
+    simp only [propagate_carry_propagate_carry_add] at h₁,
     rcases have wf : n - (b - a) < n,
         from nat.sub_lt (lt_of_lt_of_le (pow_pos two_pos _) (le_of_not_gt hn2))
           (nat.sub_pos_of_lt h₂),
@@ -684,7 +684,7 @@ begin
       exact nat.le_of_lt_succ b.2,
       simp * at *, },
     conv_rhs { rw h2 },
-    refine propogate_eq_of_carry_eq _ _ _ _ _ _ _ _ _,
+    refine propagate_eq_of_carry_eq _ _ _ _ _ _ _ _ _,
     { have h : ↑b + (n - 2 ^ card α) = (a + (n - 2 ^ card α)) + (b - a),
       { zify,
         rw [nat.cast_sub, nat.cast_sub],
@@ -692,7 +692,7 @@ begin
         exact le_of_lt h₂,
         simp * at * },
       rw [← h₁],
-      apply propogate_carry2_eq_of_seq_eq_lt,
+      apply propagate_carry2_eq_of_seq_eq_lt,
       simp { contextual := tt } },
     { intros y c hc,
       simp only [add_lt_iff_neg_left, not_lt_zero', if_false],
@@ -705,10 +705,10 @@ begin
 end
 using_well_founded { rel_tac := λ _ _, `[exact ⟨_, measure_wf psigma.snd⟩] }
 
-lemma propogate_eq_zero_iff (init_carry : α → bool)
+lemma propagate_eq_zero_iff (init_carry : α → bool)
   (next_bit : Π (carry : α → bool) (bits : β → bool), (α → bool) × bool) :
-  (∀ seq, propogate init_carry next_bit seq = zero_seq) ↔
-  (∀ seq, ∀ i < 2 ^ (card α), propogate init_carry next_bit seq i = ff) :=
+  (∀ seq, propagate init_carry next_bit seq = zero_seq) ↔
+  (∀ seq, ∀ i < 2 ^ (card α), propagate init_carry next_bit seq i = ff) :=
 begin
   split,
   { intros h i _,
