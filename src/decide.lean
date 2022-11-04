@@ -15,7 +15,7 @@ begin
       (t₁.xor t₂).eval
       (λ i j, if hij : i < ar ∧ j < c
         then seq ⟨i, hij.1⟩ ⟨j, hij.2⟩ else ff) i = ff) _,
-  rw [eval_eq_iff_xor_seq_eq_zero, p.good],
+  rw [eval_eq_iff_xor_seq_eq_zero, p.good, propagate_struc.eval],
   rw [function.funext_iff, propagate_eq_zero_iff],
   simp only [← eval_fin_eq_eval, p.good],
   split,
@@ -25,7 +25,7 @@ begin
     intros b j hj,
     simp [lt_of_le_of_lt hj hi] },
   { intros h seq i,
-    rw h,
+    rw [propagate_struc.eval, h],
     exact i.2 }
 end
 
