@@ -47,3 +47,5 @@ def term.eval : Π (t : term) (vars : ℕ → ℕ → bool), ℕ → bool
 | (not t) vars := not_seq (term.eval t vars)
 | (ls t) vars := ls_seq (term.eval t vars)
 | (add t₁ t₂) vars := add_seq (term.eval t₁ vars) (term.eval t₂ vars)
+
+instance : has_add term := ⟨add⟩
