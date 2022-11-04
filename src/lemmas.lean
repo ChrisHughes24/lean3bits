@@ -302,13 +302,199 @@ begin
         propagate_succ] } }
 end
 
-structure propagate_solution (t : term) : Type 1 :=
+structure propagate_struc (arity : Type) : Type 1 :=
 ( α  : Type )
 [ i : fintype α ]
 ( init_carry : α → bool )
-( next_bit : Π (carry : α → bool) (bits : fin (arity t) → bool),
+( next_bit : Π (carry : α → bool) (bits : arity → bool),
     (α → bool) × bool )
-( good : t.eval_fin = propagate init_carry next_bit )
+
+attribute [instance] propagate_struc.i
+
+namespace propagate_struc
+
+variables {arity : Type} (p : propagate_struc arity)
+
+def eval : (arity → ℕ → bool) → ℕ → bool :=
+propagate p.init_carry p.next_bit
+
+def change_vars {arity2 : Type} (change_vars : arity → arity2) :
+  propagate_struc arity2 :=
+{ α := p.α,
+  i := p.i,
+  init_carry := p.init_carry,
+  next_bit := λ carry bits, p.next_bit carry (λ i, bits (change_vars i)) }
+
+def compose [fintype arity]
+  (new_arity : Type)
+  (q_arity : arity → Type)
+  (vars : Π (a : arity), q_arity a → new_arity)
+  (q : Π (a : arity), propagate_struc (q_arity a)) :
+  propagate_struc (new_arity) :=
+{ α := p.α ⊕ (Σ a, (q a).α),
+  i := by letI := p.i; apply_instance,
+  init_carry := sum.elim p.init_carry (λ x, (q x.1).init_carry x.2),
+  next_bit := λ carry bits,
+    let f : Π (a : arity), ((q a).α → bool) × bool := λ a, (q a).next_bit (λ d,
+        carry (inr ⟨a, d⟩)) (λ d, bits (vars a d)) in
+    let g : (p.α → bool) × bool := (p.next_bit (carry ∘ inl) (λ a, (f a).2)) in
+    (sum.elim g.1 (λ x, (f x.1).1 x.2), g.2) }
+
+lemma eval_compose [fintype arity]
+  (new_arity : Type)
+  (q_arity : arity → Type)
+  (vars : Π (a : arity), q_arity a → new_arity)
+  (q : Π (a : arity), propagate_struc (q_arity a))
+  (x : new_arity → ℕ → bool):
+  (p.compose new_arity q_arity vars q).eval x =
+  p.eval (λ a, (q a).eval (λ i, x (vars _ i))) :=
+begin
+  ext n,
+  simp only [eval, compose, propagate_propagate]
+end
+
+def and : propagate_struc bool :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, bits tt && bits ff) }
+
+@[simp] lemma eval_and (x : bool → ℕ → bool) : and.eval x = and_seq (x tt) (x ff) :=
+by ext n; cases n; simp [and, and_seq, eval, propagate_succ]
+
+def or : propagate_struc bool :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, bits tt || bits ff) }
+
+@[simp] lemma eval_or (x : bool → ℕ → bool) : or.eval x = or_seq (x tt) (x ff) :=
+by ext n; cases n; simp [or, or_seq, eval, propagate_succ]
+
+def xor : propagate_struc bool :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, bxor (bits tt) (bits ff)) }
+
+@[simp] lemma eval_xor (x : bool → ℕ → bool) : xor.eval x = xor_seq (x tt) (x ff) :=
+by ext n; cases n; simp [xor, xor_seq, eval, propagate_succ]
+
+def add : propagate_struc bool :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, ff,
+  next_bit := λ (carry : unit → bool) (bits : bool → bool),
+      (λ _, (bits tt && bits ff) || (bits ff && carry ()) || (bits tt && carry ()),
+        bxor (bits tt) (bxor (bits ff) (carry ()))) }
+
+@[simp] lemma eval_add (x : bool → ℕ → bool) : add.eval x = add_seq (x tt) (x ff) :=
+begin
+  dsimp [add, eval],
+  rw [add_eq_propagate],
+  congr,
+  funext b,
+  cases b; refl
+end
+
+def not : propagate_struc unit :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, bnot (bits ())) }
+
+@[simp] lemma eval_not (x : unit → ℕ → bool) : not.eval x = not_seq (x ()) :=
+by ext n; cases n; simp [not, not_seq, eval, propagate_succ]
+
+def zero : propagate_struc (fin 0) :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, ff) }
+
+@[simp] lemma eval_zero (x : fin 0 → ℕ → bool) : zero.eval x = zero_seq :=
+by ext n; cases n; simp [zero, zero_seq, eval, propagate_succ]
+
+def one : propagate_struc (fin 0) :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, tt,
+  next_bit := λ carry bits, (λ _, ff, carry ()) }
+
+@[simp] lemma eval_one (x : fin 0 → ℕ → bool) : one.eval x = one_seq :=
+by ext n; cases n; simp [one, one_seq, eval, propagate_succ2]
+
+def ls : propagate_struc unit :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, ff,
+  next_bit := λ carry bits, (bits, carry ()) }
+
+@[simp] lemma eval_ls (x : unit → ℕ → bool) : ls.eval x = ls_seq (x ()) :=
+by ext n; cases n; simp [ls, ls_seq, eval, propagate_succ2]
+
+def var (n : ℕ) : propagate_struc (fin (n+1)) :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, bits (fin.last n)) }
+
+@[simp] lemma eval_var (n : ℕ) (x : fin (n+1) → ℕ → bool) : (var n).eval x = x (fin.last n) :=
+by ext m; cases m; simp [var, eval, propagate_succ]
+
+end propagate_struc
+
+structure propagate_solution (t : term) extends propagate_struc (fin (arity t)) :=
+( good : t.eval_fin = to_propagate_struc.eval )
+
+def compose_unary
+  (p : propagate_struc unit)
+  {t : term}
+  (q : propagate_solution t) :
+  propagate_struc (fin (arity t)) :=
+p.compose
+  (fin (arity t))
+  _
+  (λ _ , id)
+  (λ _, q.to_propagate_struc)
+
+def compose_binary
+  (p : propagate_struc bool)
+  {t₁ t₂ : term}
+  (q₁ : propagate_solution t₁)
+  (q₂ : propagate_solution t₂) :
+  propagate_struc (fin (max (arity t₁) (arity t₂))) :=
+p.compose (fin (max (arity t₁) (arity t₂)))
+  (λ b, fin (cond b (arity t₁) (arity t₂)))
+  (λ b i, fin.cast_le (by cases b; simp) i)
+  (λ b, bool.rec q₂.to_propagate_struc q₁.to_propagate_struc b)
+
+@[simp] lemma compose_unary_eval
+  (p : propagate_struc unit)
+  {t : term}
+  (q : propagate_solution t)
+  (x : fin (arity t) → ℕ → bool) :
+  (compose_unary p q).eval x = p.eval (λ _, t.eval_fin x) :=
+begin
+  rw [compose_unary, propagate_struc.eval_compose, q.good],
+  refl
+end
+
+@[simp] lemma compose_binary_eval
+  (p : propagate_struc bool)
+  {t₁ t₂ : term}
+  (q₁ : propagate_solution t₁)
+  (q₂ : propagate_solution t₂)
+  (x : fin (max (arity t₁) (arity t₂)) → ℕ → bool) :
+  (compose_binary p q₁ q₂).eval x = p.eval
+    (λ b, cond b (t₁.eval_fin (λ i, x (fin.cast_le (by simp) i)))
+                 (t₂.eval_fin (λ i, x (fin.cast_le (by simp) i)))) :=
+begin
+  rw [compose_binary, propagate_struc.eval_compose, q₁.good, q₂.good],
+  congr,
+  ext b,
+  cases b; refl
+end
 
 instance {α β : Type*} [fintype α] [fintype β] (b : bool) :
   fintype (cond b α β) :=
@@ -335,198 +521,42 @@ by cases b; refl
 def term_eval_eq_propagate : Π (t : term),
   propagate_solution t
 | (var n) :=
-  { α := empty,
-    i := by apply_instance,
-    init_carry := empty.elim,
-    next_bit := (λ _ (y : fin (n+1) → bool), (empty.elim, y (fin.last n))),
-    good := begin
-      ext x i,
-      cases i with i,
-      { refl },
-      { cases i,
-        { simp [term.eval_fin, propagate_succ] },
-        { simp [term.eval_fin, propagate_succ] } }
-    end }
+  { to_propagate_struc := propagate_struc.var n,
+    good := by ext; simp [term.eval_fin] }
 | zero :=
-  { α := empty,
-    i := by apply_instance,
-    init_carry := empty.elim,
-    next_bit := (λ _ (y : fin 0 → bool), (empty.elim, ff)),
-    good := by ext x i; cases i; simp [term.eval_fin, zero_seq, propagate_succ] }
+  { to_propagate_struc := propagate_struc.zero,
+    good := by ext; simp [term.eval_fin] }
 | one :=
-  { α := unit,
-    i := by apply_instance,
-    init_carry := λ _, tt,
-    next_bit := (λ carry (y : fin 0 → bool), (λ _, ff, carry ())),
-    good := begin
-      ext x i,
-      cases i with i,
-      { simp [one_seq] },
-      { cases i with i,
-        { simp [one_seq, propagate_succ] },
-        { simp [one_seq, propagate_succ] } }
-    end }
+  { to_propagate_struc := propagate_struc.one,
+    good := by ext; simp [term.eval_fin] }
 | (and t₁ t₂) :=
-  let p₁ := term_eval_eq_propagate t₁ in
-  let p₂ := term_eval_eq_propagate t₂ in
-  { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
-    i := by letI := p₁.i; letI := p₂.i; apply_instance,
-    init_carry := sum.elim (λ _, ff)
-      (λ x, match x with
-        | ⟨tt, a⟩ := p₁.init_carry a
-        | ⟨ff, a⟩ := p₂.init_carry a
-        end),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, and_eq_propagate],
-      simp only [cond_propagate],
-      dsimp,
-      have := propagate_propagate
-        (λ (a : bool),
-          show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
-            from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
-        empty.elim
-        (λ f y, (empty.elim, y tt && y ff))
-        (λ b, show cond b p₁.α p₂.α → bool, from bool.rec p₂.init_carry p₁.init_carry b)
-        (λ b, bool.rec p₂.next_bit p₁.next_bit b) x,
-      dsimp at this,
-      convert this.trans _; clear this,
-      ext b, cases b; refl,
-      congr,
-      ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
-    end }
+  let q₁ := term_eval_eq_propagate t₁ in
+  let q₂ := term_eval_eq_propagate t₂ in
+  { to_propagate_struc := compose_binary propagate_struc.and q₁ q₂,
+    good := by ext; simp; refl }
 | (or t₁ t₂) :=
-  let p₁ := term_eval_eq_propagate t₁ in
-  let p₂ := term_eval_eq_propagate t₂ in
-  { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
-    i := by letI := p₁.i; letI := p₂.i; apply_instance,
-    init_carry := sum.elim (λ _, ff)
-      (λ x, match x with
-        | ⟨tt, a⟩ := p₁.init_carry a
-        | ⟨ff, a⟩ := p₂.init_carry a
-        end),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, or_eq_propagate],
-      simp only [cond_propagate],
-      dsimp,
-      have := propagate_propagate
-        (λ (a : bool),
-          show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
-            from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
-        empty.elim
-        (λ f y, (empty.elim, y tt || y ff))
-        (λ b, show cond b p₁.α p₂.α → bool, from bool.rec p₂.init_carry p₁.init_carry b)
-        (λ b, bool.rec p₂.next_bit p₁.next_bit b) x,
-      dsimp at this,
-      convert this.trans _; clear this,
-      ext b, cases b; refl,
-      congr,
-      ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
-    end }
+  let q₁ := term_eval_eq_propagate t₁ in
+  let q₂ := term_eval_eq_propagate t₂ in
+  { to_propagate_struc := compose_binary propagate_struc.or q₁ q₂,
+    good := by ext; simp; refl }
 | (xor t₁ t₂) :=
-  let p₁ := term_eval_eq_propagate t₁ in
-  let p₂ := term_eval_eq_propagate t₂ in
-  { α := empty ⊕ Σ (b : bool), cond b p₁.α p₂.α,
-    i := by letI := p₁.i; letI := p₂.i; apply_instance,
-    init_carry := sum.elim (λ _, ff)
-      (λ x, match x with
-        | ⟨tt, a⟩ := p₁.init_carry a
-        | ⟨ff, a⟩ := p₂.init_carry a
-        end),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, xor_eq_propagate],
-      simp only [cond_propagate],
-      dsimp,
-      have := propagate_propagate
-        (λ (a : bool),
-          show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
-            from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
-        empty.elim
-        (λ f y, (empty.elim, bxor (y tt) (y ff)))
-        (λ b, show cond b p₁.α p₂.α → bool, from bool.rec p₂.init_carry p₁.init_carry b)
-        (λ b, bool.rec p₂.next_bit p₁.next_bit b) x,
-      dsimp at this,
-      convert this.trans _; clear this,
-      ext b, cases b; refl,
-      congr,
-      ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
-    end }
+  let q₁ := term_eval_eq_propagate t₁ in
+  let q₂ := term_eval_eq_propagate t₂ in
+  { to_propagate_struc := compose_binary propagate_struc.xor q₁ q₂,
+    good := by ext; simp; refl }
 | (ls t) :=
-  let p := term_eval_eq_propagate t in
-  { α := unit ⊕ Σ s : unit, p.α,
-    i := by letI := p.i; apply_instance,
-    init_carry := sum.elim (λ _, ff) (λ x, p.init_carry x.2),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p.good, ls_eq_propagate],
-      dsimp,
-      exact propagate_propagate
-        (λ (a : unit),
-          show fin (arity t) → fin (arity t), from id) i
-        (λ _ : unit, ff)
-        (λ carry bits, (bits, carry ()))
-        (λ _, p.init_carry)
-        (λ _, p.next_bit) x
-    end }
+  let q := term_eval_eq_propagate t in
+  { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.ls q,
+    good := by ext; simp; refl }
 | (not t) :=
-  let p := term_eval_eq_propagate t in
-  { α := empty ⊕ Σ s : unit, p.α,
-    i := by letI := p.i; apply_instance,
-    init_carry := sum.elim empty.elim (λ x, p.init_carry x.2),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p.good, not_eq_propagate],
-      dsimp,
-      have := propagate_propagate
-        (λ (a : unit),
-          show fin (arity t) → fin (arity t), from id) i
-        empty.elim
-        (λ carry bits, (empty.elim, !(bits ())))
-        (λ _, p.init_carry)
-        (λ _, p.next_bit) x,
-      convert this.trans _; clear this,
-      dsimp,
-      refl
-    end }
+  let q := term_eval_eq_propagate t in
+  { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.not q,
+    good := by ext; simp; refl }
 | (add t₁ t₂) :=
-  let p₁ := term_eval_eq_propagate t₁ in
-  let p₂ := term_eval_eq_propagate t₂ in
-  { α := unit ⊕ Σ (b : bool), cond b p₁.α p₂.α,
-    i := by letI := p₁.i; letI := p₂.i; apply_instance,
-    init_carry := sum.elim (λ _, ff)
-      (λ x, match x with
-        | ⟨tt, a⟩ := p₁.init_carry a
-        | ⟨ff, a⟩ := p₂.init_carry a
-        end),
-    next_bit := _,
-    good := begin
-      ext x i,
-      rw [term.eval_fin, p₁.good, p₂.good, add_eq_propagate],
-      simp only [cond_propagate],
-      dsimp,
-      have := propagate_propagate
-        (λ (a : bool),
-          show cond a (fin (arity t₁)) (fin (arity t₂)) → fin (arity (t₁.and t₂)),
-            from bool.rec (fin.cast_le (by simp)) (fin.cast_le (by simp)) a) i
-        (λ _, ff)
-        (λ (carry : unit → bool) (bits : bool → bool),
-          (λ _, (bits tt && bits ff) || (bits ff && carry ()) || (bits tt && carry ()),
-            bxor (bits tt) (bxor (bits ff) (carry ()))))
-        (λ b, show cond b p₁.α p₂.α → bool, from bool.rec p₂.init_carry p₁.init_carry b)
-        (λ b, bool.rec p₂.next_bit p₁.next_bit b) x,
-      dsimp at this,
-      convert this.trans _; clear this,
-      ext b, cases b; refl,
-      congr,
-      ext b, rcases b with ⟨ff, _⟩| ⟨tt, _⟩; refl
-    end }
+  let q₁ := term_eval_eq_propagate t₁ in
+  let q₂ := term_eval_eq_propagate t₂ in
+  { to_propagate_struc := compose_binary propagate_struc.add q₁ q₂,
+    good := by ext; simp; refl }
 
 variables
   (init_carry : α → bool)
