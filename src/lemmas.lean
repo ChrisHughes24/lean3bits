@@ -185,17 +185,21 @@ open term
 | (var n) := n+1
 | zero := 0
 | one := 0
+| neg_one := 0
 | (and t₁ t₂) := max (arity t₁) (arity t₂)
 | (or t₁ t₂) := max (arity t₁) (arity t₂)
 | (xor t₁ t₂) := max (arity t₁) (arity t₂)
 | (not t) := arity t
 | (ls t) := arity t
 | (add t₁ t₂) := max (arity t₁) (arity t₂)
+| (sub t₁ t₂) := max (arity t₁) (arity t₂)
+| (neg t) := arity t
 
 @[simp] def term.eval_fin : Π (t : term) (vars : fin (arity t) → ℕ → bool), ℕ → bool
 | (var n) vars := vars (fin.last n)
 | zero vars := zero_seq
 | one vars := one_seq
+| neg_one vars := neg_one_seq
 | (and t₁ t₂) vars :=
   and_seq (term.eval_fin t₁
     (λ i, vars (fin.cast_le (by simp [arity]) i)))
@@ -218,6 +222,12 @@ open term
     (λ i, vars (fin.cast_le (by simp [arity]) i)))
   (term.eval_fin t₂
     (λ i, vars (fin.cast_le (by simp [arity]) i)))
+| (sub t₁ t₂) vars :=
+  sub_seq (term.eval_fin t₁
+    (λ i, vars (fin.cast_le (by simp [arity]) i)))
+  (term.eval_fin t₂
+    (λ i, vars (fin.cast_le (by simp [arity]) i)))
+| (neg t) vars := neg_seq (term.eval_fin t vars)
 
 lemma eval_fin_eq_eval (t : term) (vars : ℕ → ℕ → bool) :
   term.eval_fin t (λ i, vars i) = term.eval t vars :=
@@ -299,6 +309,61 @@ begin
   { cases n,
     { simp [add_seq, add_seq_aux, propagate_succ] },
     { simp [add_seq, add_seq_aux, add_seq_aux_eq_propagate_carry,
+        propagate_succ] } }
+end
+
+lemma sub_seq_aux_eq_propagate_carry (x y : ℕ → bool) (n : ℕ) :
+  (sub_seq_aux x y n).2 = propagate_carry (λ _, ff)
+    (λ (carry : unit → bool) (bits : bool → bool),
+      λ _, (bnot (bits tt) && (bits ff)) ||
+        (bnot (bxor (bits tt) (bits ff))) && carry ())
+  (λ b, cond b x y) n () :=
+begin
+  induction n,
+  { simp [sub_seq_aux] },
+  { simp [sub_seq_aux, *] }
+end
+
+lemma sub_eq_propagate (x y : ℕ → bool) :
+  sub_seq x y = propagate (λ _, ff)
+    (λ (carry : unit → bool) (bits : bool → bool),
+      (λ _, (bnot (bits tt) && (bits ff)) ||
+        ((bnot (bxor (bits tt) (bits ff))) && carry ()),
+        bxor (bits tt) (bxor (bits ff) (carry ()))))
+  (λ b, cond b x y) :=
+begin
+  ext n,
+  cases n with n,
+  { simp [sub_seq, sub_seq_aux] },
+  { cases n,
+    { simp [sub_seq, sub_seq_aux, propagate_succ] },
+    { simp [sub_seq, sub_seq_aux, sub_seq_aux_eq_propagate_carry,
+        propagate_succ] } }
+end
+
+lemma neg_seq_aux_eq_propagate_carry (x : ℕ → bool) (n : ℕ) :
+  (neg_seq_aux x n).2 = propagate_carry (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      λ _, (bnot (bits ())) && (carry ()))
+  (λ _, x) n () :=
+begin
+  induction n,
+  { simp [neg_seq_aux] },
+  { simp [neg_seq_aux, *] }
+end
+
+lemma neg_eq_propagate (x : ℕ → bool) :
+  neg_seq x = propagate (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      (λ _, (bnot (bits ())) && (carry ()), bxor (bnot (bits ())) (carry ())))
+  (λ _, x) :=
+begin
+  ext n,
+  cases n with n,
+  { simp [neg_seq, neg_seq_aux] },
+  { cases n,
+    { simp [neg_seq, neg_seq_aux, propagate_succ] },
+    { simp [neg_seq, neg_seq_aux, neg_seq_aux_eq_propagate_carry,
         propagate_succ] } }
 end
 
@@ -397,6 +462,40 @@ begin
   cases b; refl
 end
 
+def sub : propagate_struc bool :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, ff,
+  next_bit := λ (carry : unit → bool) (bits : bool → bool),
+      (λ _, (bnot (bits tt) && (bits ff)) ||
+        ((bnot (bxor (bits tt) (bits ff))) && carry ()),
+        bxor (bits tt) (bxor (bits ff) (carry ()))) }
+
+@[simp] lemma eval_sub (x : bool → ℕ → bool) : sub.eval x = sub_seq (x tt) (x ff) :=
+begin
+  dsimp [sub, eval],
+  rw [sub_eq_propagate],
+  congr,
+  funext b,
+  cases b; refl
+end
+
+def neg : propagate_struc unit :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, tt,
+  next_bit := λ (carry : unit → bool) (bits : unit → bool),
+    (λ _, (bnot (bits ())) && (carry ()), bxor (bnot (bits ())) (carry ())) }
+
+@[simp] lemma eval_neg (x : unit → ℕ → bool) : neg.eval x = neg_seq (x ()) :=
+begin
+  dsimp [neg, eval],
+  rw [neg_eq_propagate],
+  congr,
+  funext b,
+  cases b; refl
+end
+
 def not : propagate_struc unit :=
 { α := empty,
   i := by apply_instance,
@@ -423,6 +522,15 @@ def one : propagate_struc (fin 0) :=
 
 @[simp] lemma eval_one (x : fin 0 → ℕ → bool) : one.eval x = one_seq :=
 by ext n; cases n; simp [one, one_seq, eval, propagate_succ2]
+
+def neg_one : propagate_struc (fin 0) :=
+{ α := empty,
+  i := by apply_instance,
+  init_carry := empty.elim,
+  next_bit := λ carry bits, (empty.elim, tt) }
+
+@[simp] lemma eval_neg_one (x : fin 0 → ℕ → bool) : neg_one.eval x = neg_one_seq :=
+by ext n; cases n; simp [neg_one, neg_one_seq, eval, propagate_succ2]
 
 def ls : propagate_struc unit :=
 { α := unit,
@@ -529,6 +637,9 @@ def term_eval_eq_propagate : Π (t : term),
 | one :=
   { to_propagate_struc := propagate_struc.one,
     good := by ext; simp [term.eval_fin] }
+| neg_one :=
+  { to_propagate_struc := propagate_struc.neg_one,
+    good := by ext; simp [term.eval_fin] }
 | (and t₁ t₂) :=
   let q₁ := term_eval_eq_propagate t₁ in
   let q₂ := term_eval_eq_propagate t₂ in
@@ -556,6 +667,15 @@ def term_eval_eq_propagate : Π (t : term),
   let q₁ := term_eval_eq_propagate t₁ in
   let q₂ := term_eval_eq_propagate t₂ in
   { to_propagate_struc := compose_binary propagate_struc.add q₁ q₂,
+    good := by ext; simp; refl }
+| (sub t₁ t₂) :=
+  let q₁ := term_eval_eq_propagate t₁ in
+  let q₂ := term_eval_eq_propagate t₂ in
+  { to_propagate_struc := compose_binary propagate_struc.sub q₁ q₂,
+    good := by ext; simp; refl }
+| (neg t) :=
+  let q := term_eval_eq_propagate t in
+  { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.neg q,
     good := by ext; simp; refl }
 
 variables
