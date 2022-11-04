@@ -11,6 +11,8 @@ inductive term : Type
 | add : term → term → term
 | sub : term → term → term
 | neg : term → term
+| incr : term → term
+| decr : term → term
 
 open term
 
@@ -59,6 +61,24 @@ def neg_seq_aux (x : ℕ → bool) : ℕ → bool × bool
 def neg_seq (x : ℕ → bool) : ℕ → bool :=
 λ n, (neg_seq_aux x n).1
 
+def incr_seq_aux (x : ℕ → bool) : ℕ → bool × bool
+| 0 := (bnot (x 0), x 0)
+| (n+1) := let carry := (incr_seq_aux n).2 in
+  let a := x (n + 1) in
+  (bxor a carry, a && carry)
+
+def incr_seq (x : ℕ → bool) : ℕ → bool :=
+λ n, (incr_seq_aux x n).1
+
+def decr_seq_aux (x : ℕ → bool) : ℕ → bool × bool
+| 0 := (bnot (x 0), bnot (x 0))
+| (n+1) := let borrow := (decr_seq_aux n).2 in
+  let a := x (n + 1) in
+  (bxor a borrow, bnot a && borrow)
+
+def decr_seq (x : ℕ → bool) : ℕ → bool :=
+λ n, (decr_seq_aux x n).1
+
 def term.eval : Π (t : term) (vars : ℕ → ℕ → bool), ℕ → bool
 | (var n) vars := vars n
 | zero vars := zero_seq
@@ -72,6 +92,8 @@ def term.eval : Π (t : term) (vars : ℕ → ℕ → bool), ℕ → bool
 | (add t₁ t₂) vars := add_seq (term.eval t₁ vars) (term.eval t₂ vars)
 | (sub t₁ t₂) vars := sub_seq (term.eval t₁ vars) (term.eval t₂ vars)
 | (neg t) vars := neg_seq (term.eval t vars)
+| (incr t) vars := incr_seq (term.eval t vars)
+| (decr t) vars := decr_seq (term.eval t vars)
 
 instance : has_add term := ⟨add⟩
 instance : has_sub term := ⟨sub⟩

@@ -194,6 +194,8 @@ open term
 | (add t₁ t₂) := max (arity t₁) (arity t₂)
 | (sub t₁ t₂) := max (arity t₁) (arity t₂)
 | (neg t) := arity t
+| (incr t) := arity t
+| (decr t) := arity t
 
 @[simp] def term.eval_fin : Π (t : term) (vars : fin (arity t) → ℕ → bool), ℕ → bool
 | (var n) vars := vars (fin.last n)
@@ -228,6 +230,8 @@ open term
   (term.eval_fin t₂
     (λ i, vars (fin.cast_le (by simp [arity]) i)))
 | (neg t) vars := neg_seq (term.eval_fin t vars)
+| (incr t) vars := incr_seq (term.eval_fin t vars)
+| (decr t) vars := decr_seq (term.eval_fin t vars)
 
 lemma eval_fin_eq_eval (t : term) (vars : ℕ → ℕ → bool) :
   term.eval_fin t (λ i, vars i) = term.eval t vars :=
@@ -364,6 +368,58 @@ begin
   { cases n,
     { simp [neg_seq, neg_seq_aux, propagate_succ] },
     { simp [neg_seq, neg_seq_aux, neg_seq_aux_eq_propagate_carry,
+        propagate_succ] } }
+end
+
+lemma incr_seq_aux_eq_propagate_carry (x : ℕ → bool) (n : ℕ) :
+  (incr_seq_aux x n).2 = propagate_carry (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      λ _, (bits ()) && carry ())
+  (λ _, x) n () :=
+begin
+  induction n,
+  { simp [incr_seq_aux] },
+  { simp [incr_seq_aux, *] }
+end
+
+lemma incr_eq_propagate (x : ℕ → bool) :
+  incr_seq x = propagate (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      (λ _, (bits ()) && carry (), bxor (bits ()) (carry ())))
+  (λ _, x) :=
+begin
+  ext n,
+  cases n with n,
+  { simp [incr_seq, incr_seq_aux] },
+  { cases n,
+    { simp [incr_seq, incr_seq_aux, propagate_succ] },
+    { simp [incr_seq, incr_seq_aux, incr_seq_aux_eq_propagate_carry,
+        propagate_succ] } }
+end
+
+lemma decr_seq_aux_eq_propagate_carry (x : ℕ → bool) (n : ℕ) :
+  (decr_seq_aux x n).2 = propagate_carry (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      λ _, (bnot (bits ())) && carry ())
+  (λ _, x) n () :=
+begin
+  induction n,
+  { simp [decr_seq_aux] },
+  { simp [decr_seq_aux, *] }
+end
+
+lemma decr_eq_propagate (x : ℕ → bool) :
+  decr_seq x = propagate (λ _, tt)
+    (λ (carry : unit → bool) (bits : unit → bool),
+      (λ _, (bnot (bits ())) && carry (), bxor (bits ()) (carry ())))
+  (λ _, x) :=
+begin
+  ext n,
+  cases n with n,
+  { simp [decr_seq, decr_seq_aux] },
+  { cases n,
+    { simp [decr_seq, decr_seq_aux, propagate_succ] },
+    { simp [decr_seq, decr_seq_aux, decr_seq_aux_eq_propagate_carry,
         propagate_succ] } }
 end
 
@@ -550,6 +606,36 @@ def var (n : ℕ) : propagate_struc (fin (n+1)) :=
 @[simp] lemma eval_var (n : ℕ) (x : fin (n+1) → ℕ → bool) : (var n).eval x = x (fin.last n) :=
 by ext m; cases m; simp [var, eval, propagate_succ]
 
+def incr : propagate_struc unit :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, tt,
+  next_bit := λ carry bits, (λ _, bits () && carry (), bxor (bits ()) (carry ())) }
+
+@[simp] lemma eval_incr (x : unit → ℕ → bool) : incr.eval x = incr_seq (x ()) :=
+begin
+  dsimp [incr, eval],
+  rw [incr_eq_propagate],
+  congr,
+  funext b,
+  cases b; refl
+end
+
+def decr : propagate_struc unit :=
+{ α := unit,
+  i := by apply_instance,
+  init_carry := λ _, tt,
+  next_bit := λ carry bits, (λ _, bnot (bits ()) && carry (), bxor (bits ()) (carry ())) }
+
+@[simp] lemma eval_decr (x : unit → ℕ → bool) : decr.eval x = decr_seq (x ()) :=
+begin
+  dsimp [decr, eval],
+  rw [decr_eq_propagate],
+  congr,
+  funext b,
+  cases b; refl
+end
+
 end propagate_struc
 
 structure propagate_solution (t : term) extends propagate_struc (fin (arity t)) :=
@@ -676,6 +762,14 @@ def term_eval_eq_propagate : Π (t : term),
 | (neg t) :=
   let q := term_eval_eq_propagate t in
   { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.neg q,
+    good := by ext; simp; refl }
+| (incr t) :=
+  let q := term_eval_eq_propagate t in
+  { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.incr q,
+    good := by ext; simp; refl }
+| (decr t) :=
+  let q := term_eval_eq_propagate t in
+  { to_propagate_struc := by dsimp [arity]; exact compose_unary propagate_struc.decr q,
     good := by ext; simp; refl }
 
 variables
