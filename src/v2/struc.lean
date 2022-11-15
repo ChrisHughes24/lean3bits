@@ -98,6 +98,6 @@ def reachable_from (b : bool) : ∀ (n : ℕ), set (finset.Icc p.min_carry p.max
 | 0     := (mod_two ∘ coe) ⁻¹' {b}
 | (n+1) := ⋃ (x : arity → bool), (p.next_carry x ∘ coe) ⁻¹' (coe '' reachable_from n)
 
-
+#print set.image_union
 
 end propagate_struc
