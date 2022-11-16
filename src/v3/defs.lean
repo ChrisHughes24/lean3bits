@@ -13,7 +13,6 @@ inductive term : Type
 | neg : term → term
 | incr : term → term
 | decr : term → term
-| mul : term → term → term
 
 open term
 
@@ -80,11 +79,11 @@ def decr_seq_aux (x : ℕ → bool) : ℕ → bool × bool
 def decr_seq (x : ℕ → bool) : ℕ → bool :=
 λ n, (decr_seq_aux x n).1
 
-def mul_seq_aux (x y : ℕ → bool) : ℕ → bool × (ℕ → bool)
-| 0 := (x 0 && y 0, ff)
-| (n+1) := let carry := (mul_seq_aux n).2 in
-  let a := x (n + 1), b := y (n + 1) in
-  (bxor (a && b) carry, (a && b) || (b && carry) || (a && carry))
+-- def mul_seq_aux (x y : ℕ → bool) : ℕ → bool × (ℕ → bool)
+-- | 0 := (x 0 && y 0, ff)
+-- | (n+1) := let carry := (mul_seq_aux n).2 in
+--   let a := x (n + 1), b := y (n + 1) in
+--   (bxor (a && b) carry, (a && b) || (b && carry) || (a && carry))
 
 def term.eval : Π (t : term) (vars : ℕ → ℕ → bool), ℕ → bool
 | (var n) vars := vars n
