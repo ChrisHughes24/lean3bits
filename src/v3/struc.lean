@@ -30,6 +30,12 @@ begin
   simp [function.swap, function.funext_iff, *] at *
 end
 
+@[simp] lemma inv_proj (x : X) : X.inv (λ i, X.proj i x) = x :=
+begin
+  have := (X.is_inv x (λ i, X.proj i x)).symm,
+  simp [function.swap, function.funext_iff, eq_comm, *] at *
+end
+
 lemma closed_embedding (X : profinite) : closed_embedding (function.swap X.proj) :=
 closed_embedding_of_continuous_injective_closed
   X.continuous_swap_proj
@@ -280,34 +286,6 @@ begin
   refl
 end
 
-def shrink (C : clopen X) : clopen X :=
-{ s := (C.s.attach.filter (λ i, ∃ (x : C.s → bool), x ∈ C.S ∧
-     x.update i (bnot (x i)) ∉ C.S)).map ⟨subtype.val, subtype.val_injective⟩,
-  S := finset.univ.filter (λ x, let y : C.s → bool :=
-    λ i, if h : ∃ (x : C.s → bool), x ∈ C.S ∧ x.update i (bnot (x i)) ∉ C.S
-        then x ⟨i, finset.mem_map.2 ⟨i, by simpa using h⟩⟩
-        else tt in
-    y ∈ C.S) }
-
-@[simp] lemma to_set_shrink (C : clopen X) : (shrink C).to_set = C.to_set :=
-begin
-  dsimp [shrink, clopen.to_set],
-  simp [set.ext_iff, function.funext_iff, set.mem_preimage],
-  dsimp [set_of, set.preimage],
-  intro x,
-  have : ∀ x y : C.s → bool, (∀ i, (∃ (z : C.s → bool), z ∈ C.S ∧ z.update i (bnot (z i)) ∉ C.S) →
-    x i = y i) → ((x ∈ C.S) ↔ (y ∈ C.S)),
-  { intros x y h,
-    by_contra hxy,
-    simp at h,
-    have : ∃ i, x i ≠ y i := not_forall.1 (λ h, by simp [show x = y, from funext h, *] at *),
-    cases this with i hi,
-    admit },
-  apply this,
-  rintros i h,
-  rw if_pos h
-end
-
 def finset.inl {X Y : Type*} (s : finset (X ⊕ Y)) : finset X :=
 (@finset.filter _ (sum.elim (λ _, true) (λ _, false))
   (id (λ x : X ⊕ Y, by cases x; dsimp; apply_instance)) s).attach.map
@@ -493,24 +471,29 @@ def diag {X : profinite} : X.map (X.prod X) :=
 
 def prodmk {X Y Z : profinite} (f : X.map Y) (g : X.map Z) : X.map (Y.prod Z) :=
 { to_fun := λ x, (f x, g x),
-  preimage := λ C, let s := (f.preimage C.fst).s ∪ (g.preimage C.snd).s in
-  { s := s,
-    S := finset.univ.filter (λ x,
-      let x' : X.ι → bool :=
-        λ i, if hi : i ∈ s then x ⟨i, hi⟩ else tt in
-      (f (X.inv x'), g (X.inv x')) ∈ C.to_set) },
+  preimage := λ C, clopen.bUnion (λ x : C.S,
+    let D : clopen (Y.prod Z) := ⟨C.s, {x}⟩ in
+    (f.preimage D.fst).inter (g.preimage D.snd)),
   continuous' := begin
     intros x C,
-    dsimp [clopen.to_set, profinite.prod],
-    simp,
-    rw [iff_iff_eq],
-    congr' 1,
-    ext i,
-    cases i with i hi,
-    cases i with i i,
-    { dsimp, admit
-       }, admit
-
+    simp [to_set_inter, ← f.continuous, ← g.continuous, clopen.mem_fst,
+      clopen.mem_snd],
+    simp [clopen.to_set],
+    dsimp,
+    split,
+    { intro h,
+      exact ⟨_, h, ⟨_, rfl⟩, ⟨_, rfl⟩⟩ },
+    { rintro ⟨y, hy, ⟨z, rfl⟩, ⟨b, hb⟩⟩,
+      simp only [function.funext_iff] at hb,
+      convert hy,
+      funext i,
+      specialize hb i,
+      cases i with i hi,
+      cases i with i i,
+      { dsimp [profinite.prod],
+        refl },
+      { dsimp [profinite.prod] at *,
+        exact hb  } }
   end }
 
 def prodmapm {W X Y Z : profinite} (f : W.map Y) (g : X.map Z) : (W.prod X).map (Y.prod Z) :=
