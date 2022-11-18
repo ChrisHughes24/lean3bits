@@ -129,13 +129,14 @@ def ls_struc (b : bool) : propagate_struc boolp boolp :=
 
 def add_struc : propagate_struc (boolp.prod boolp) boolp :=
 { init := ff,
-  transition := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)),
-  output := bitwise_map3 (and (xor (var 0) (var 1)) (var 2)) }
+  transition := bitwise_map3 (or (and (var 0) (var 1)) (or (and (var 0) (var 2)) (and (var 1) (var 2)))),
+  output := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)) }
 
+--Probably wrong
 def sub_struc : propagate_struc (boolp.prod boolp) boolp :=
 { init := ff,
-  transition := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)),
-  output := bitwise_map3 (and (xor (var 0) (var 1)) (var 2)) }
+  transition := bitwise_map3 (and (xor (var 0) (var 1)) (var 2)),
+  output := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)) }
 
 def band_bnot_map : (boolp.prod boolp).map boolp :=
 bitwise_map2 (and (var 0) (var 1).not)
@@ -143,16 +144,19 @@ bitwise_map2 (and (var 0) (var 1).not)
 def bnot_band_map : (boolp.prod boolp).map boolp :=
 bitwise_map2 (and (var 0).not (var 1))
 
+--Probably wrong
 def neg_struc : propagate_struc boolp boolp :=
 { init := ff,
   transition := sndm,
   output := band_bnot_map }
 
+-- Probably wrong
 def incr_struc : propagate_struc boolp boolp :=
 { init := tt,
   transition := sndm,
   output := and_map }
 
+-- Probably wrong
 def decr_struc : propagate_struc boolp boolp :=
 { init := tt,
   transition := sndm,
@@ -362,7 +366,8 @@ end
 open term
 
 #eval check_eq ((var 0).xor (var 0)) term.zero 1
-#eval check_eq (var 0 + var 1 + var 2) (var 1 + var 0) 2
+#eval check_eq ((var 0) + (var 1)) ((var 1) + (var 0)) 3
+#eval check_eq ((var 0 + var 1) + var 2) (var 1 + (var 0 + var 2)) 3
 
 
 -- #eval (bitwise_struc bxor).nth_output (λ _, (tt, tt)) 0
