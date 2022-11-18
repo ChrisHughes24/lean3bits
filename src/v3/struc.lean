@@ -146,10 +146,15 @@ def twoadic : profinite :=
   inv := id,
   is_inv := by simp [function.swap] }
 
+instance sgda : has_repr twoadic.ι := by dsimp [twoadic]; apply_instance
+
 open circuit
 
 def circuit.to_set (c : circuit X.ι) : set X :=
 { x | c.eval (λ i, X.proj i x) }
+
+instance (c : circuit X.ι) : decidable_pred (circuit.to_set c) :=
+by dsimp [circuit.to_set]; apply_instance
 
 structure map (X Y : profinite) : Type :=
 ( to_fun : X → Y )
@@ -163,6 +168,12 @@ instance (X Y : profinite) : has_coe_to_fun (map X Y) (λ _, X → Y) :=
 theorem map.continuous {Y : profinite}: ∀ (f : map X Y) (x : X) (C : circuit Y.ι),
   f x ∈ C.to_set ↔ x ∈ (f.preimage C).to_set :=
 map.continuous'
+
+@[simp] theorem eval_preimage {Y : profinite} (f : map X Y) (x : X.ι → bool) (C : circuit Y.ι) :
+  (f.preimage C).eval x ↔ C.eval (λ i, Y.proj i (f (X.inv x))) :=
+((f.continuous (X.inv x) C).trans begin
+  simp [circuit.to_set],
+end).symm
 
 def map.id (X : profinite) : map X X :=
 { to_fun := id,
@@ -222,26 +233,44 @@ circuit.bOr (C.sum_vars_right.pi (λ _, [tt, ff]))
   (λ x, circuit.assign_vars C
     (λ i, sum.rec (λ i _, sum.inl i) (λ i hi, sum.inr (x i (by simp [hi]))) i))
 
-lemma mem_fst {Y : profinite} (C : circuit (X.prod Y).ι) (x : X) :
-  x ∈ (fst C).to_set ↔ ∃ y, (x, y) ∈ C.to_set :=
+lemma eval_fst {Y : profinite} (C : circuit (X.prod Y).ι) (x : X.ι → bool) :
+  (fst C).eval x ↔ ∃ y, C.eval (sum.elim x y) :=
 begin
-  dsimp [fst, circuit.to_set],
+  dsimp [fst],
   simp only [eval_assign_vars, list.mem_pi, or_iff_not_imp_left, eval_bOr,
     list.mem_cons_iff, list.mem_singleton,
     eq_ff_eq_not_eq_tt, imp_self, implies_true_iff, exists_true_left],
   dsimp [set_of, set.mem_def, profinite.prod],
   split,
+  { rintro ⟨a, ha⟩,
+    use [λ i, if hi : i ∈ C.sum_vars_right then a i hi else tt],
+    rw [eval_eq_evalv],
+    convert ha,
+    ext i hi,
+    cases i with i i; simp * },
+  { rintro ⟨a, ha⟩,
+    use [λ i _, a i],
+    rw [eval_eq_evalv] at ha,
+    convert ha,
+    ext i hi,
+    cases i with i i; simp * }
+end
+
+lemma mem_fst {Y : profinite} (C : circuit (X.prod Y).ι) (x : X) :
+  x ∈ (fst C).to_set ↔ ∃ y, (x, y) ∈ C.to_set :=
+begin
+  dsimp [circuit.to_set],
+  simp only [eval_fst],
+  dsimp [set_of, set.mem_def, profinite.prod],
+  split,
   { rintros ⟨a, ha⟩,
-    refine ⟨Y.inv (λ i, if hi : i ∈ C.sum_vars_right then a i hi else tt), _⟩,
-    simp [eval_eq_evalv],
+    refine ⟨Y.inv a, _⟩,
     convert ha,
     ext i hi,
     cases i with i i; simp * },
   { rintro ⟨y, hy⟩,
-    use λ i hi, Y.proj i y,
+    use λ i, Y.proj i y,
     convert hy,
-    simp [eval_eq_evalv],
-    congr' 1,
     ext i hi,
     cases i with i i; simp * }
 end
@@ -251,36 +280,92 @@ circuit.bOr (C.sum_vars_left.pi (λ _, [tt, ff]))
   (λ x, circuit.assign_vars C
     (λ i, sum.rec (λ i hi, sum.inr (x i (by simp [hi]))) (λ i _, sum.inl i) i))
 
-lemma mem_snd {Y : profinite} (C : circuit (X.prod Y).ι) (y : Y) :
-  y ∈ (snd C).to_set ↔ ∃ x, (x, y) ∈ C.to_set :=
+lemma eval_snd {Y : profinite} (C : circuit (X.prod Y).ι) (y : Y.ι → bool) :
+  (snd C).eval y ↔ ∃ x, C.eval (sum.elim x y) :=
 begin
-  dsimp [snd, circuit.to_set],
+  dsimp [snd],
   simp only [eval_assign_vars, list.mem_pi, or_iff_not_imp_left, eval_bOr,
     list.mem_cons_iff, list.mem_singleton,
     eq_ff_eq_not_eq_tt, imp_self, implies_true_iff, exists_true_left],
   dsimp [set_of, set.mem_def, profinite.prod],
   split,
+  { rintro ⟨a, ha⟩,
+    use [λ i, if hi : i ∈ C.sum_vars_left then a i hi else tt],
+    rw [eval_eq_evalv],
+    convert ha,
+    ext i hi,
+    cases i with i i; simp * },
+  { rintro ⟨a, ha⟩,
+    use [λ i _, a i],
+    rw [eval_eq_evalv] at ha,
+    convert ha,
+    ext i hi,
+    cases i with i i; simp * }
+end
+
+lemma mem_snd {Y : profinite} (C : circuit (X.prod Y).ι) (y : Y) :
+  y ∈ (snd C).to_set ↔ ∃ x, (x, y) ∈ C.to_set :=
+begin
+  dsimp [circuit.to_set],
+  simp only [eval_snd],
+  dsimp [set_of, set.mem_def, profinite.prod],
+  split,
   { rintros ⟨a, ha⟩,
-    refine ⟨X.inv (λ i, if hi : i ∈ C.sum_vars_left then a i hi else tt), _⟩,
-    simp [eval_eq_evalv],
+    refine ⟨X.inv a, _⟩,
     convert ha,
     ext i hi,
     cases i with i i; simp * },
   { rintro ⟨x, hx⟩,
-    use λ i hi, X.proj i x,
+    use λ i, X.proj i x,
     convert hx,
-    simp [eval_eq_evalv],
-    congr' 1,
     ext i hi,
     cases i with i i; simp * }
 end
 
 def prod_mk {X Y Z : profinite} (f : X.map Y) (g : X.map Z) : X.map (Y.prod Z) :=
 { to_fun := λ x, (f x, g x),
-  preimage := λ C, circuit.bOr C.vars (λ i, sum.elim _ _ i),
-  continuous' := _ }
+  preimage := λ C, circuit.bOr (C.vars.pi (λ i, [tt, ff]))
+    (λ x, if hx : C.evalv x then
+      (f.preimage (fst (single x))).and (g.preimage (snd (single x)))
+      else false),
+  continuous' := begin
+    intros x C,
+    simp only [circuit.to_set, list.mem_pi, or_iff_not_imp_left, eval, mem_set_of_eq,
+      eval_bOr, list.mem_cons_iff, list.mem_singleton, eq_ff_eq_not_eq_tt,
+      imp_self, implies_true_iff, band_coe_iff, exists_true_left],
+    dsimp [profinite.prod],
+    split,
+    { intro h,
+      refine ⟨λ i _, (Y.prod Z).proj i (f x, g x), _⟩,
+      rw if_pos,
+      simp only [eval, eval_fst, eval_snd, band_coe_iff, eval_preimage, inv_proj],
+      split,
+      { use [λ i, Z.proj i (g x)],
+        refine (eval_single _ _).2 _,
+        intros i hi,
+        cases i with i i; refl },
+      { use [λ i, Y.proj i (f x)],
+        refine (eval_single _ _).2 _,
+        intros i hi,
+        cases i with i i; refl },
+      { rw eval_eq_evalv at h,
+        convert h } },
+    { rintro ⟨a, ha⟩,
+      split_ifs at ha,
+      { simp [eval_fst, eval_snd] at ha,
+        convert h,
+        rw [eval_eq_evalv],
+        congr' 1,
+        funext i hi,
+        rcases ha with ⟨⟨p, hp⟩, ⟨q, hq⟩⟩,
+        have := (eval_single _ _).1 hp i hi,
+        have := (eval_single _ _).1 hq i hi,
+        cases i with i i;
+        simp * at * },
+      { simpa using ha } }
+  end }
 
-def prod_map {W X Y Z : profinite} (f : W.map Y) (g : X.map Z) : (W.prod X).map (Y.prod Z) :=
+def prod_mapm {W X Y Z : profinite} (f : W.map Y) (g : X.map Z) : (W.prod X).map (Y.prod Z) :=
 prod_mk (fstm.comp f) (sndm.comp g)
 
 def unitp : profinite :=
@@ -347,10 +432,6 @@ begin
   rw [nth_output, nth_output, ho, this, hx _ (le_refl _)]
 end
 
-def iterate_preimage (o : bool) : Π (n : ℕ), circuit state.ι
-| 0     := (p.output.preimage (circuit.of_bool o)).fst
-| (n+1) := (p.transition.preimage (iterate_preimage n)).fst
-
 inductive result : Type
 | false_after (n : ℕ) : result
 | true_for_n (n : ℕ) : result
@@ -363,14 +444,15 @@ instance : has_repr result :=
 | result.true_forall := "true forall"
 end⟩
 
-def decide_if_zeros_aux : Π (n : ℕ), result × clopen state
-| 0 := (result.true_for_n 0, (p.output.preimage ⟨{()}, {λ _, tt}⟩).fst)
+def decide_if_zeros_aux : Π (n : ℕ), result × circuit state.ι
+| 0 := (result.true_for_n 0, fst
+  (p.output.preimage (circuit.single (λ (i : unit) (hi : i ∈ [()]), tt))))
 | (n+1) :=
   match decide_if_zeros_aux n with
   | (result.true_for_n m, s) :=
-    let s' := (p.transition.preimage s).fst in
+    let s' := fst (p.transition.preimage s) in
     if p.init ∈ s.to_set then (result.false_after (n+1), s')
-    else if s'.subset s then (result.true_forall, s)
+    else if s' ≤ s then (result.true_forall, s)
     else (result.true_for_n (n+1), s')
   | x := x
   end

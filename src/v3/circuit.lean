@@ -1,4 +1,5 @@
 import data.finset
+import .list_pi
 
 universes u v
 
@@ -14,6 +15,18 @@ inductive circuit (α : Type u) : Type u
 
 namespace circuit
 variables {α : Type u} {β : Type v}
+
+def reppr [has_repr α] : (circuit α) → string
+| true := "⊤"
+| false := "⊥"
+| (var x) := repr x
+| (and x y) := "(" ++ reppr x ++ " ∧ " ++ reppr y ++ ")"
+| (or x y) := "(" ++ reppr x ++ " ∨ " ++ reppr y ++ ")"
+| (not x) := "¬" ++ reppr x
+| (xor x y) := "(" ++ reppr x ++ " ⊕ " ++ reppr y ++ ")"
+| (imp x y) := "(" ++ reppr x ++ " → " ++ reppr y ++ ")"
+
+instance [has_repr α] : has_repr (circuit α) := ⟨reppr⟩
 
 def vars [decidable_eq α] : circuit α → list α
 | true := []
@@ -71,6 +84,13 @@ instance : preorder (circuit α) :=
 { le := (≤),
   le_refl := λ c f h, h,
   le_trans := λ c₁ c₂ c₃ h₁₂ h₂₃ f h₁, h₂₃ f (h₁₂ f h₁) }
+
+instance [decidable_eq α] :
+  decidable_rel ((≤) : circuit α → circuit α → Prop) :=
+λ c₁ c₂, decidable_of_iff (∀ (x : Π (i : α), (i ∈ (c₁.vars ++ c₂.vars).dedup) → bool),
+  x ∈ (c₁.vars ++ c₂.vars).dedup.pi (λ _, [tt, ff]) →
+  c₁.evalv (λ i hi, x i (by simp [hi])) → c₂.evalv (λ i hi, x i (by simp [hi])))
+   sorry
 
 def simplify_and : circuit α → circuit α → circuit α
 | true c := c
@@ -360,11 +380,11 @@ begin
       (λ x hx, h₁ x (or.inr hx)) (λ x hx, h₂ x (or.inr hx))]
 end
 
-def bOr {α : Type u} {β : Type v} : Π (s : list α) (f : α → circuit β), circuit β
+def bOr : Π (s : list α) (f : α → circuit β), circuit β
 | [] _ := false
 | (a::l) f := l.foldl (λ c x, simplify_or c (f x)) (f a)
 
-@[simp] lemma eval_foldl_or {α : Type u} {β : Type v} :
+@[simp] lemma eval_foldl_or :
   ∀ (s : list α) (f : α → circuit β) (c : circuit β) (g : β → bool),
     (eval (s.foldl (λ c x, simplify_or c (f x)) c) g : Prop) ↔
       eval c g ∨ (∃ a ∈ s, eval (f a) g)
@@ -385,13 +405,36 @@ def bOr {α : Type u} {β : Type v} : Π (s : list α) (f : α → circuit β), 
     { exact or.inr ⟨_, ha, h⟩ } }
 end
 
-@[simp] lemma eval_bOr {α : Type u} {β : Type v} :
+@[simp] lemma eval_bOr :
   ∀ {s : list α} {f : α → circuit β} {g : β → bool},
     eval (bOr s f) g ↔ ∃ a ∈ s, eval (f a) g
 | [] _ _ := by simp [bOr, eval]
 | [a] f g := by simp [bOr, eval]
 | (a::l) f g :=
 by rw [bOr, eval_foldl_or, list.exists_mem_cons_iff]
+
+def bAnd : Π (s : list α) (f : α → circuit β), circuit β
+| [] _ := true
+| (a::l) f := l.foldl (λ c x, simplify_and c (f x)) (f a)
+
+@[simp] lemma eval_foldl_and :
+  ∀ (s : list α) (f : α → circuit β) (c : circuit β) (g : β → bool),
+    (eval (s.foldl (λ c x, simplify_and c (f x)) c) g : Prop) ↔
+      eval c g ∧ (∀ a ∈ s, eval (f a) g)
+| [] f c g := by simp [eval]; cases c.eval g; simp
+| (a::l) f c g := begin
+  rw [list.foldl_cons, eval_foldl_and],
+  simp only [eval_simplify_and, band_coe_iff, list.mem_cons_iff, forall_eq_or_imp],
+  simp [and.assoc]
+end
+
+@[simp] lemma eval_bAnd :
+  ∀ {s : list α} {f : α → circuit β} {g : β → bool},
+    eval (bAnd s f) g ↔ ∀ a ∈ s, eval (f a) g
+| [] _ _ := by simp [bAnd, eval]
+| [a] f g := by simp [bAnd, eval]
+| (a::l) f g :=
+by rw [bAnd, eval_foldl_and]; simp
 
 def assign_vars [decidable_eq α] :
   Π (c : circuit α) (f : Π (a : α) (ha : a ∈ c.vars), β ⊕ bool), circuit β
@@ -476,5 +519,25 @@ end
   simp [bind, eval],
   rw [eval_bind, eval_bind]
 end
+
+def single [decidable_eq α] {s : list α} (x : Π a ∈ s, bool) : circuit α :=
+bAnd s (λ i, if hi : i ∈ s then cond (x i hi) (var i) (not (var i)) else true)
+
+@[simp] lemma eval_single [decidable_eq α] {s : list α} (x : Π a ∈ s, bool) (g : α → bool):
+  eval (single x) g ↔ (∀ a ∈ s, g a = x a (by simpa)) :=
+begin
+  rw [single],
+  simp,
+  split,
+  { intros h a ha,
+    specialize h a ha,
+    rw [dif_pos ha] at h,
+    cases x a ha; simpa using h },
+  { intros h a ha,
+    rw [dif_pos ha],
+    specialize h a ha,
+    cases x a ha; simp [h] }
+end
+
 
 end circuit
