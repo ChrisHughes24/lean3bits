@@ -60,6 +60,10 @@ lemma eval_eq_evalv [decidable_eq α] : ∀ (c : circuit α) (f : α → bool),
 | (xor c₁ c₂) f := by rw [eval, evalv, eval_eq_evalv, eval_eq_evalv]
 | (imp c₁ c₂) f := by rw [eval, evalv, eval_eq_evalv, eval_eq_evalv]
 
+@[simp] def of_bool : bool → circuit α
+| tt := true
+| ff := false
+
 instance : has_le (circuit α) :=
 ⟨λ c₁ c₂, ∀ f, eval c₁ f → eval c₂ f⟩
 
@@ -67,6 +71,78 @@ instance : preorder (circuit α) :=
 { le := (≤),
   le_refl := λ c f h, h,
   le_trans := λ c₁ c₂ c₃ h₁₂ h₂₃ f h₁, h₂₃ f (h₁₂ f h₁) }
+
+def simplify_and : circuit α → circuit α → circuit α
+| true c := c
+| c true := c
+| false _ := false
+| _ false := false
+| c₁ c₂ := and c₁ c₂
+
+@[simp] lemma eval_simplify_and : ∀ (c₁ c₂ : circuit α) (f : α → bool),
+  eval (simplify_and c₁ c₂) f = (eval c₁ f) && (eval c₂ f) :=
+begin
+  intros c₁ c₂ f,
+  cases c₁; cases c₂; simp [*, circuit.simplify_and, eval] at *
+end
+
+def simplify_or : circuit α → circuit α → circuit α
+| true _ := true
+| _ true := true
+| false c := c
+| c false := c
+| c₁ c₂ := or c₁ c₂
+
+@[simp] lemma eval_simplify_or : ∀ (c₁ c₂ : circuit α) (f : α → bool),
+  eval (simplify_or c₁ c₂) f = (eval c₁ f) || (eval c₂ f) :=
+begin
+  intros c₁ c₂ f,
+  cases c₁; cases c₂; simp [*, circuit.simplify_or, eval] at *
+end
+
+def simplify_not : circuit α → circuit α
+| true := false
+| false := true
+| (not c) := c
+| c := not c
+
+@[simp] lemma eval_simplify_not : ∀ (c : circuit α) (f : α → bool),
+  eval (simplify_not c) f = bnot (eval c f) :=
+begin
+  intros c f,
+  cases c; simp [*, circuit.simplify_not, eval] at *
+end
+
+def simplify_xor : circuit α → circuit α → circuit α
+| false c := c
+| c false := c
+| true c := not c
+| c true := not c
+| c₁ c₂ := xor c₁ c₂
+
+lemma bnot_bxor : ∀ (b₁ b₂ : bool), bnot (bxor b₁ b₂) = bxor b₁ (bnot b₂) :=
+dec_trivial
+
+@[simp] lemma eval_simplify_xor : ∀ (c₁ c₂ : circuit α) (f : α → bool),
+  eval (simplify_xor c₁ c₂) f = bxor (eval c₁ f) (eval c₂ f) :=
+begin
+  intros c₁ c₂ f,
+  cases c₁; cases c₂; simp [*, circuit.simplify_xor, eval, bnot_bxor] at *,
+end
+
+def simplify_imp : circuit α → circuit α → circuit α
+| false _ := true
+| _ true := true
+| true c := c
+| c false := not c
+| c₁ c₂ := imp c₁ c₂
+
+@[simp] lemma eval_simplify_imp : ∀ (c₁ c₂ : circuit α) (f : α → bool),
+  eval (simplify_imp c₁ c₂) f = bnot (eval c₁ f) || (eval c₂ f) :=
+begin
+  intros c₁ c₂ f,
+  cases c₁; cases c₂; simp [*, circuit.simplify_imp, eval] at *
+end
 
 def map : Π (c : circuit α) (f : α → β), circuit β
 | true _ := true
@@ -79,7 +155,7 @@ def map : Π (c : circuit α) (f : α → β), circuit β
 | (imp c₁ c₂) f := imp (map c₁ f) (map c₂ f)
 
 lemma eval_map {c : circuit α} {f : α → β} {g : β → bool} :
-  eval (map c f) g = eval c (g ∘ f) :=
+  eval (map c f) g = eval c (λ x, g (f x)) :=
 begin
   induction c; simp [*, circuit.map, eval] at *
 end
@@ -88,42 +164,22 @@ def simplify : Π (c : circuit α), circuit α
 | true := true
 | false := false
 | (var x) := var x
-| (and c₁ c₂) := match simplify c₁, simplify c₂ with
-  | false, _ := false
-  | _, false := false
-  | true, c₂ := c₂
-  | c₁, true := c₁
-  | c₁, c₂ := and c₁ c₂
-  end
-| (or c₁ c₂) := match simplify c₁, simplify c₂ with
-  | true, _ := true
-  | _, true := true
-  | false, c₂ := c₂
-  | c₁, false := c₁
-  | c₁, c₂ := or c₁ c₂
-  end
-| (not c) := match simplify c with
-  | true := false
-  | false := true
-  | not c := c
-  | c := not c
-  end
-| (xor c₁ c₂) := match simplify c₁, simplify c₂ with
-  | false, c₂ := c₂
-  | c₁, false := c₁
-  | true, c₂ := not c₂
-  | c₁, true := not c₁
-  | c₁, c₂ := xor c₁ c₂
-  end
-| (imp c₁ c₂) := match simplify c₁, simplify c₂ with
-  | false, _ := true
-  | _, true := true
-  | true, c₂ := c₂
-  | c₁, false := not c₁
-  | c₁, c₂ := imp c₁ c₂
-  end
+| (and c₁ c₂) := simplify_and (simplify c₁) (simplify c₂)
+| (or c₁ c₂) := simplify_or (simplify c₁) (simplify c₂)
+| (not c) := simplify_not (simplify c)
+| (xor c₁ c₂) := simplify_xor (simplify c₁) (simplify c₂)
+| (imp c₁ c₂) := simplify_imp (simplify c₁) (simplify c₂)
 
-
+@[simp] lemma eval_simplify : Π {c : circuit α} {f : α → bool},
+  eval (simplify c) f = eval c f
+| true _ := rfl
+| false _ := rfl
+| (var x) f := rfl
+| (and c₁ c₂) f := by rw [simplify]; simp *
+| (or c₁ c₂) f := by rw [simplify]; simp *
+| (not c) f := by rw [simplify]; simp *
+| (xor c₁ c₂) f := by rw [simplify]; simp *
+| (imp c₁ c₂) f := by rw [simplify]; simp *
 
 def sum_vars_left [decidable_eq α] [decidable_eq β] : circuit (α ⊕ β) → list α
 | true := []
@@ -304,21 +360,18 @@ begin
       (λ x hx, h₁ x (or.inr hx)) (λ x hx, h₂ x (or.inr hx))]
 end
 
-@[simp] lemma eval_simplify {c : circuit α} {f : α → bool} :
-  eval (simplify c) f = eval c f := sorry
-
 def bOr {α : Type u} {β : Type v} : Π (s : list α) (f : α → circuit β), circuit β
 | [] _ := false
-| (a::l) f := l.foldl (λ c x, or c (f x)) (f a)
+| (a::l) f := l.foldl (λ c x, simplify_or c (f x)) (f a)
 
 @[simp] lemma eval_foldl_or {α : Type u} {β : Type v} :
   ∀ (s : list α) (f : α → circuit β) (c : circuit β) (g : β → bool),
-    (eval (s.foldl (λ c x, or c (f x)) c) g : Prop) ↔
+    (eval (s.foldl (λ c x, simplify_or c (f x)) c) g : Prop) ↔
       eval c g ∨ (∃ a ∈ s, eval (f a) g)
 | [] f c g := by simp [eval]; cases c.eval g; simp
 | (a::l) f c g := begin
   rw [list.foldl_cons, eval_foldl_or],
-  simp only [eval, bor_coe_iff, exists_prop, list.mem_cons_iff],
+  simp only [eval_simplify_or, bor_coe_iff, exists_prop, list.mem_cons_iff],
   split,
   { intro h,
     rcases h with (h₁ | h₂) | ⟨a, ha⟩,
@@ -345,14 +398,14 @@ def assign_vars [decidable_eq α] :
 | true _ := true
 | false _ := false
 | (var x) f := sum.elim var (λ b : bool, if b then true else false) (f x (by simp [vars]))
-| (and c₁ c₂) f := and (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
+| (and c₁ c₂) f := simplify_and (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
                        (assign_vars c₂ (λ x hx, f x (by simp [hx, vars])))
-| (or c₁ c₂) f := or (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
+| (or c₁ c₂) f := simplify_or (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
                       (assign_vars c₂ (λ x hx, f x (by simp [hx, vars])))
-| (not c) f := not (assign_vars c (λ x hx, f x (by simp [hx, vars])))
-| (xor c₁ c₂) f := xor (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
+| (not c) f := simplify_not (assign_vars c (λ x hx, f x (by simp [hx, vars])))
+| (xor c₁ c₂) f := simplify_xor (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
                         (assign_vars c₂ (λ x hx, f x (by simp [hx, vars])))
-| (imp c₁ c₂) f := imp (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
+| (imp c₁ c₂) f := simplify_imp (assign_vars c₁ (λ x hx, f x (by simp [hx, vars])))
                         (assign_vars c₂ (λ x hx, f x (by simp [hx, vars])))
 
 lemma eval_assign_vars [decidable_eq α] : ∀ {c : circuit α}
@@ -388,5 +441,40 @@ end
   rw [eval_assign_vars, eval_assign_vars]
 end
 
+def bind : Π (c : circuit α) (f : α → circuit β), circuit β
+| true _ := true
+| false _ := false
+| (var x) f := f x
+| (and c₁ c₂) f := simplify_and (bind c₁ f) (bind c₂ f)
+| (or c₁ c₂) f := simplify_or (bind c₁ f) (bind c₂ f)
+| (not c) f := simplify_not (bind c f)
+| (xor c₁ c₂) f := simplify_xor (bind c₁ f) (bind c₂ f)
+| (imp c₁ c₂) f := simplify_imp (bind c₁ f) (bind c₂ f)
+
+lemma eval_bind : ∀ (c : circuit α) (f : α → circuit β) (g : β → bool),
+  eval (bind c f) g = eval c (λ a, eval (f a) g)
+| true _ _ := rfl
+| false _ _ := rfl
+| (var x) f g := rfl
+| (and c₁ c₂) f g := begin
+  simp [bind, eval],
+  rw [eval_bind, eval_bind]
+end
+| (or c₁ c₂) f g := begin
+  simp [bind, eval],
+  rw [eval_bind, eval_bind]
+end
+| (not c) f g := begin
+  simp [bind, eval],
+  rw [eval_bind]
+end
+| (xor c₁ c₂) f g := begin
+  simp [bind, eval],
+  rw [eval_bind, eval_bind]
+end
+| (imp c₁ c₂) f g := begin
+  simp [bind, eval],
+  rw [eval_bind, eval_bind]
+end
 
 end circuit
