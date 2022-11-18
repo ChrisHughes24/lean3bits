@@ -371,10 +371,10 @@ open term
 
 set_option profiler true
 
-#eval check_eq ((var 0).xor (var 0)) (var 1) 1
+#eval check_eq ((var 0).xor (var 0)) (term.zero) 1
 
-#eval let p :=  (of_term ((var 0 + var 1).xor (var 1 + var 0))).2 in
-(p.output.preimage ⟨{()}, {λ _, tt}⟩).fst
+-- #eval let p :=  (of_term ((var 0 + var 1).xor (var 1 + var 0))).2 in
+-- (p.output.preimage ⟨{()}, {λ _, tt}⟩).fst
 -- #eval (propagate_struc.proj 0).nth_output (λ _ _, tt) 0
 
 -- #eval (bitwise_struc bxor).nth_output (λ _, (tt, tt)) 0
