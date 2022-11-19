@@ -168,11 +168,11 @@ def map : Π (c : circuit α) (f : α → β), circuit β
 | true _ := true
 | false _ := false
 | (var x) f := var (f x)
-| (and c₁ c₂) f := and (map c₁ f) (map c₂ f)
-| (or c₁ c₂) f := or (map c₁ f) (map c₂ f)
-| (not c) f := not (map c f)
-| (xor c₁ c₂) f := xor (map c₁ f) (map c₂ f)
-| (imp c₁ c₂) f := imp (map c₁ f) (map c₂ f)
+| (and c₁ c₂) f := simplify_and (map c₁ f) (map c₂ f)
+| (or c₁ c₂) f := simplify_or (map c₁ f) (map c₂ f)
+| (not c) f := simplify_not (map c f)
+| (xor c₁ c₂) f := simplify_xor (map c₁ f) (map c₂ f)
+| (imp c₁ c₂) f := simplify_imp (map c₁ f) (map c₂ f)
 
 lemma eval_map {c : circuit α} {f : α → β} {g : β → bool} :
   eval (map c f) g = eval c (λ x, g (f x)) :=

@@ -422,7 +422,7 @@ instance : has_repr result :=
 | result.true_forall := "true forall"
 end⟩
 
-def decide_if_zeros_aux : Π (n : ℕ), result × circuit state.ι
+def decide_if_zeros_aux [has_repr state.ι] : Π (n : ℕ), result × circuit state.ι
 | 0 := (result.true_for_n 0, fst
   (p.output.preimage (circuit.single (λ (i : unit) (hi : i ∈ [()]), tt))))
 | (n+1) :=
@@ -431,11 +431,11 @@ def decide_if_zeros_aux : Π (n : ℕ), result × circuit state.ι
     let s' := fst (p.transition.preimage s) in
     if p.init ∈ s.to_set then (result.false_after (n+1), s')
     else if s' ≤ s then (result.true_forall, s)
-    else (result.true_for_n (n+1), s')
+    else (result.true_for_n (n+1), s.or s')
   | x := x
   end
 
-def decide_if_zeros (n : ℕ) : result :=
+def decide_if_zeros [has_repr state.ι] (n : ℕ) : result :=
 (decide_if_zeros_aux p n).1
 
 end propagate_struc
