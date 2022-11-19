@@ -170,10 +170,13 @@ theorem map.continuous {Y : profinite}: ∀ (f : map X Y) (x : X) (C : circuit Y
 map.continuous'
 
 @[simp] theorem eval_preimage {Y : profinite} (f : map X Y) (x : X.ι → bool) (C : circuit Y.ι) :
-  (f.preimage C).eval x ↔ C.eval (λ i, Y.proj i (f (X.inv x))) :=
-((f.continuous (X.inv x) C).trans begin
+  (f.preimage C).eval x = C.eval (λ i, Y.proj i (f (X.inv x))) :=
+begin
+  rw [← bool.coe_bool_iff],
+  refine ((f.continuous (X.inv x) C).trans _).symm,
   simp [circuit.to_set],
-end).symm
+end
+
 
 def map.id (X : profinite) : map X X :=
 { to_fun := id,
@@ -324,45 +327,20 @@ end
 
 def prod_mk {X Y Z : profinite} (f : X.map Y) (g : X.map Z) : X.map (Y.prod Z) :=
 { to_fun := λ x, (f x, g x),
-  preimage := λ C, circuit.bOr (C.vars.pi (λ i, [tt, ff]))
-    (λ x, if hx : C.evalv x then
-      (f.preimage (fst (single x))).and (g.preimage (snd (single x)))
-      else false),
+  preimage := λ C, C.bind (sum.elim (λ i, f.preimage (var i)) (λ i, g.preimage (var i))),
   continuous' := begin
     intros x C,
-    simp only [circuit.to_set, list.mem_pi, or_iff_not_imp_left, eval, mem_set_of_eq,
-      eval_bOr, list.mem_cons_iff, list.mem_singleton, eq_ff_eq_not_eq_tt,
-      imp_self, implies_true_iff, band_coe_iff, exists_true_left],
-    dsimp [profinite.prod],
-    split,
-    { intro h,
-      refine ⟨λ i _, (Y.prod Z).proj i (f x, g x), _⟩,
-      rw if_pos,
-      simp only [eval, eval_fst, eval_snd, band_coe_iff, eval_preimage, inv_proj],
-      split,
-      { use [λ i, Z.proj i (g x)],
-        refine (eval_single _ _).2 _,
-        intros i hi,
-        cases i with i i; refl },
-      { use [λ i, Y.proj i (f x)],
-        refine (eval_single _ _).2 _,
-        intros i hi,
-        cases i with i i; refl },
-      { rw eval_eq_evalv at h,
-        convert h } },
-    { rintro ⟨a, ha⟩,
-      split_ifs at ha,
-      { simp [eval_fst, eval_snd] at ha,
-        convert h,
-        rw [eval_eq_evalv],
-        congr' 1,
-        funext i hi,
-        rcases ha with ⟨⟨p, hp⟩, ⟨q, hq⟩⟩,
-        have := (eval_single _ _).1 hp i hi,
-        have := (eval_single _ _).1 hq i hi,
-        cases i with i i;
-        simp * at * },
-      { simpa using ha } }
+    simp [circuit.to_set, circuit.eval_bind],
+    rw [iff_iff_eq],
+    congr' 2,
+    funext i,
+    cases i with i i,
+    { dsimp [profinite.prod],
+      rw [eval_preimage f],
+      simp },
+    { dsimp [profinite.prod],
+      rw [eval_preimage g],
+      simp }
   end }
 
 def prod_mapm {W X Y Z : profinite} (f : W.map Y) (g : X.map Z) : (W.prod X).map (Y.prod Z) :=

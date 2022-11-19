@@ -132,35 +132,25 @@ def add_struc : propagate_struc (boolp.prod boolp) boolp :=
   transition := bitwise_map3 (or (and (var 0) (var 1)) (or (and (var 0) (var 2)) (and (var 1) (var 2)))),
   output := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)) }
 
---Probably wrong
 def sub_struc : propagate_struc (boolp.prod boolp) boolp :=
 { init := ff,
-  transition := bitwise_map3 (and (xor (var 0) (var 1)) (var 2)),
+  transition := bitwise_map3 (or (and (not (var 1)) (var 2)) (and (not (xor (var 1) (var 2))) (var 0))),
   output := bitwise_map3 (xor (xor (var 0) (var 1)) (var 2)) }
 
-def band_bnot_map : (boolp.prod boolp).map boolp :=
-bitwise_map2 (and (var 0) (var 1).not)
-
-def bnot_band_map : (boolp.prod boolp).map boolp :=
-bitwise_map2 (and (var 0).not (var 1))
-
---Probably wrong
 def neg_struc : propagate_struc boolp boolp :=
-{ init := ff,
-  transition := sndm,
-  output := band_bnot_map }
+{ init := tt,
+  transition := bitwise_map2 (and (not (var 1)) (var 0)),
+  output := bitwise_map2 (xor (not (var 1)) (var 0)) }
 
--- Probably wrong
 def incr_struc : propagate_struc boolp boolp :=
 { init := tt,
-  transition := sndm,
-  output := and_map }
+  transition := and_map,
+  output := xor_map }
 
--- Probably wrong
 def decr_struc : propagate_struc boolp boolp :=
 { init := tt,
-  transition := sndm,
-  output := bnot_band_map }
+  transition := bitwise_map2 (and (not (var 1)) (var 0)),
+  output := xor_map }
 
 def rearrange_prod₁ {W X Y Z : profinite} :
   ((W.prod X).prod (Y.prod Z)).map ((W.prod Y).prod (X.prod Z)) :=
@@ -365,10 +355,21 @@ end
 
 open term
 
-#eval check_eq ((var 0).xor (var 0)) term.zero 1
-#eval check_eq ((var 0) + (var 1)) ((var 1) + (var 0)) 3
-#eval check_eq ((var 0 + var 1) + var 2) (var 1 + (var 0 + var 2)) 3
+set_option profiler true
 
+def x : term := term.var 0
+def y : term := term.var 1
+def z : term := term.var 2
+
+#eval check_eq (x +- y) 0 2
+#eval check_eq (x - y) (x + -y) 2
+#eval check_eq (x + 1) x.incr 2
+#eval check_eq (x - 1) x.decr 2
+
+#eval check_eq (x.xor x) term.zero 1
+#eval check_eq (x + y) (y + x) 1
+#eval check_eq (x + (y + z)) ((x + y) + z) 2
+#eval check_eq (not (xor x y)) (and x y - or x y - 1) 2
 
 -- #eval (bitwise_struc bxor).nth_output (λ _, (tt, tt)) 0
 
