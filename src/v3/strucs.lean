@@ -360,15 +360,19 @@ set_option profiler true
 def x : term := term.var 0
 def y : term := term.var 1
 def z : term := term.var 2
+def a : term := term.var 3
+def b : term := term.var 4
+def c : term := term.var 5
+def d : term := term.var 6
 
-#eval check_eq (x +- y) 0 2
+#eval check_eq (x +- x) 0 2
 #eval check_eq (x - y) (x + -y) 2
 #eval check_eq (x + 1) x.incr 2
 #eval check_eq (x - 1) x.decr 2
 
 #eval check_eq (x.xor x) term.zero 1
 #eval check_eq (x + y) (y + x) 1
-#eval check_eq (x + (y + z)) ((x + y) + z) 2
+#eval check_eq ((x + y) + z) (x + (y + z)) 2
 #eval check_eq (not (xor x y)) (and x y - or x y - 1) 2
 
 -- #eval (bitwise_struc bxor).nth_output (λ _, (tt, tt)) 0
