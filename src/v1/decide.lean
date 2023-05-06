@@ -1,4 +1,4 @@
-import lemmas
+import .lemmas
 
 open fintype
 
