@@ -1,4 +1,5 @@
 import .lemmas
+import data.fintype.pi
 
 open fintype
 
