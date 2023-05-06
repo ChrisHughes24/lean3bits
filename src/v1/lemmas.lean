@@ -2,7 +2,7 @@ import data.fintype.card
 import tactic.zify
 import tactic.ring
 import tactic.linarith
-import defs
+import .defs
 
 open sum
 

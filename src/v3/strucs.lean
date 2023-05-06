@@ -348,33 +348,16 @@ instance : Π (t : term), has_repr (of_term t).1.ι
 | (term.incr t) := by letI := ι.has_repr t; dsimp [of_term]; apply_instance
 | (term.decr t) := by letI := ι.has_repr t; dsimp [of_term]; apply_instance
 
+/-- Given two `term`s and a bit length `n`, `check_eq` will check if these two
+terms are equal for all inputs, for bitvectors of length `n`. The output will be one
+of three things,
+* `true for k`, means that it is true for bitvectors of length `k`, but possibly not longer
+bitvectors
+* `true forall` means that it is true for bitvectors of arbitrary length.
+* `false after k` means that the expressions are not equal for bitvectors of length `k`
+or longer.   -/
 def check_eq (t₁ t₂ : term) (n : ℕ) : result :=
 decide_if_zeros (of_term (t₁.xor t₂)).2 n
 
 end
 
-open term
-
-set_option profiler true
-
-def x : term := term.var 0
-def y : term := term.var 1
-def z : term := term.var 2
-def a : term := term.var 3
-def b : term := term.var 4
-def c : term := term.var 5
-def d : term := term.var 6
-
-#eval check_eq (x +- x) 0 2
-#eval check_eq (x - y) (x + -y) 2
-#eval check_eq (x + 1) x.incr 2
-#eval check_eq (x - 1) x.decr 2
-
-#eval check_eq (x.xor x) term.zero 1
-#eval check_eq (x + y) (y + x) 1
-#eval check_eq ((x + y) + z) (x + (y + z)) 2
-#eval check_eq (not (xor x y)) (and x y - or x y - 1) 2
-
--- #eval (bitwise_struc bxor).nth_output (λ _, (tt, tt)) 0
-
-open term
